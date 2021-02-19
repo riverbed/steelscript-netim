@@ -1,4 +1,4 @@
-# Copyright (c) 2019 Riverbed Technology, Inc.
+# Copyright (c) 2021 Riverbed Technology, Inc.
 #
 # This software is licensed under the terms and conditions of the MIT License
 # accompanying the software ("License").  This software is distributed "AS IS"
@@ -28,17 +28,24 @@ class Device(object):
         :param str version: API version to use when communicating.
             if unspecified, this will use the latest version
         """
-
+        
         self.host = host
-        # if port != 8543:
-        #     self.host = '{0}:{1}'.format(self.host, port)
         self.auth = auth
-        self.service = Service('NetIM', host=host, auth=auth, port=port)
+
+        self.service = Service('NetIM', host=host, auth=auth, port=port,
+        verify_ssl=False, versions=None,
+        enable_auth_detection = False,
+        supports_auth_basic=True,
+        supports_auth_cookie=False,
+        supports_auth_oauth=False,
+        enable_services_version_detection=False
+        )
+
         if version is None:
             self.version = 'v1'
         else:
             self.version = version
-        # self.base_url = f'https://{self.host}:{port}/api/netim/{self.version}/'
+        
         self.base_url = f'/api/netim/{self.version}/'
         logger.info("Initialized NetIM Core Device API object with %s" % self.host)
 
