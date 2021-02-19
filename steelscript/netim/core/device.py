@@ -3,7 +3,7 @@
 # This software is licensed under the terms and conditions of the MIT License
 # accompanying the software ("License").  This software is distributed "AS IS"
 # as set forth in the License.
-from steelscript.netim.utils import RequestMethods
+from steelscript.common.service import Service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,14 +30,16 @@ class Device(object):
         """
 
         self.host = host
-        if port != 8543:
-            self.host = '{0}:{1}'.format(self.host, port)
+        # if port != 8543:
+        #     self.host = '{0}:{1}'.format(self.host, port)
         self.auth = auth
+        self.service = Service('NetIM', host=host, auth=auth, port=port)
         if version is None:
             self.version = 'v1'
         else:
             self.version = version
-        self.base_url = f'https://{self.host}:{self.port}/api/netim/{self.version}/'
+        # self.base_url = f'https://{self.host}:{port}/api/netim/{self.version}/'
+        self.base_url = f'/api/netim/{self.version}/'
         logger.info("Initialized NetIM Core Device API object with %s" % self.host)
 
     def get_all_devices(self):
@@ -48,7 +50,8 @@ class Device(object):
             result (dict): All data associated with a response.
         """
 
-        url = f"{self.base_url}device"
-        response = RequestMethods(self.session, url).request('GET')
-        result = ParseMethods.parse_data(response)
-        return result
+        url = f"{self.base_url}devices"
+        response = self.service.conn.json_request('GET', url)
+        # result = ParseMethods.parse_data(response)
+        print(response)
+        return response

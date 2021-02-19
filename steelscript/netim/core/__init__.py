@@ -11,5 +11,4 @@
 The NetProfiler package offers a set of interfaces to control and work with
 a SteelCentral NetIM appliance.
 """
-# from steelscript.netim.core.device import *
-from device import *
+from steelscript.netim.core.device import *
