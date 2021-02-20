@@ -28,7 +28,7 @@ setup_args = {
 SteelScript is a collection of libraries and scripts in Python and JavaScript
 for interacting with Riverbed Technology devices.
 For a complete guide to installation, see:
-http://pythonhosted.org/steelscript/
+https://support.riverbed.com/apis/steelscript
     ''',
 
     'platforms': 'Linux, Mac OS, Windows',
