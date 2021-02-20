@@ -16,9 +16,9 @@ setup_args = {
     'name':               'steelscript.netim',
     'namespace_packages': ['steelscript'],
     #'version':            get_version(),
-    'author':             'Riverbed Technology',
-    'author_email':       'eng-github@riverbed.com',
-    'url':                'http://pythonhosted.org/steelscript',
+    'author':             'Riverbed Community',
+    'author_email':       'community@riverbed.com',
+    'url':                'https://community.riverbed.com',
     'license':            'MIT',
     'description':        'Python module for interacting with Riverbed '
                           'NetIM with SteelScript',
