@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 '''
 ' Riverbed Community SteelScript
-`
+'
 ' print_devices-raw.py`
+'
+' Encoding: UTF8
+' End of Line Sequence: LF
 '
 ' Usage
 '     python print_devices-raw.py netim-ip-address -u admin -p password
