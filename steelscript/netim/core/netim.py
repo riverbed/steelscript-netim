@@ -279,7 +279,7 @@ class NetIM(Service):
 				json_dict_next_page = self._get_json_from_resource_page(resource_url, \
 					limit, next_offset, verify_ssl) 
 				total_items = json_dict['items']
-				total_items.append(json_dict_next_page['items'])
+				total_items.update(json_dict_next_page['items'])
 				json_dict['items'] = total_items
 
 				# There is a possibility of data changing while paging, so handle the possible changes
