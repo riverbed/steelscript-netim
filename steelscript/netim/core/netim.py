@@ -257,7 +257,8 @@ class NetIM(Service):
 
 		return json_dict
 
-	def _get_json_from_resource_page(self, resource_url, limit, offset):
+	def _get_json_from_resource_page(self, resource_url, limit, offset, verify_ssl=False):
+		### use verify_ssl
 		final_url = resource_url + '?limit=' + str(limit) + '&offset=' + str(offset)
 		json_dict = self._get_json(final_url)
 		return json_dict
