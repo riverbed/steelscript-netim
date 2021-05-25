@@ -181,6 +181,45 @@ class Devices(Definition):
 
 		self.items.append(item)
 
+class HealthEnum(Definition):
+	def __init__(self, health_value, health_name):
+		self.healthValue = health_value
+		self.healthName = health_name
+
+class CreatableGroup(Definition):
+	def __init__(self, name, description='', add_devices=[], add_groups=[], type='Subnet'):
+		self.name = name
+		self.description = description
+		self.addDevices = add_devices
+		self.addGroups = add_groups
+		self.type = type # User/Subnet
+
+class ModifiableGroup(Definition):
+	def __init__(self, name, description='', add_devices=[], add_groups=[], remove_devices=[], remove_groups=[]):
+		self.name = name
+		self.description = description
+		self.addDevices = add_devices
+		self.addGroups = add_groups
+		self.removeDevices = remove_devices
+		self.removeGroups = remove_groups
+
+class Group(Definition):
+	def __init__(self, name, display_name, id, health, interface_health, links, type, description,
+		device_count, parent_group_count, subgroup_count, custom_attributes):
+
+		self.name = name
+		self.displayName = display_name
+		self.id = id
+		self.health = health
+		self.interfaceHealth = interface_health
+		self.links = links
+		self.type = type
+		self.description = description
+		self.deviceCount = device_count
+		self.parentGroupCount = parent_group_count
+		self.subGroupCount = subgroup_count
+		self.customAttributes = custom_attributes
+
 class Metric(Definition):
 
 	def __init__(self, name, display_name, meta, id, description, units, index, alertable, name_ext,
@@ -267,13 +306,16 @@ class NetIM(Service):
 
 		return json_dict
 
-	def _get_json_from_resource_page(self, resource_url, limit, offset, verify_ssl=False):
-		### use verify_ssl
-		final_url = resource_url + '?limit=' + str(limit) + '&offset=' + str(offset)
+	def _get_json_from_resource_page(self, resource_url, limit, offset):
+		if '?' in resource_url:
+			next_url_char = '&'
+		else:
+			next_url_char = '?'
+		final_url = resource_url + next_url_char + 'limit=' + str(limit) + '&offset=' + str(offset)
 		json_dict = self._get_json(final_url)
 		return json_dict
 
-	def _get_json_from_resource(self, resource_url, verify_ssl=False):
+	def _get_json_from_resource(self, resource_url):
 		json_dict = self._get_json(resource_url)
 
 		# Handle error in return gracefully so script can continue
@@ -287,7 +329,7 @@ class NetIM(Service):
 			limit = json_dict['meta']['limit']
 			while next_offset < total:
 				json_dict_next_page = self._get_json_from_resource_page(resource_url, \
-					limit, next_offset, verify_ssl) 
+					limit, next_offset) 
 				total_items = json_dict['items']
 				total_items.extend(json_dict_next_page['items'])
 				json_dict['items'] = total_items
@@ -325,7 +367,8 @@ class NetIM(Service):
 			return self.map_cache[map_cache_key]
 
 		try:
-			json_dict = self._get_json_from_resource(self, object_type)
+			url = f'{self.base_url}{object_type}'
+			json_dict = self._get_json_from_resource(url)
 		except:
 			logger.info("Unable to pull {object_type} resource from NetIM")
 			return obj_name_to_id_dict
@@ -333,7 +376,7 @@ class NetIM(Service):
 		try:
 			items = json_dict['items']
 		except KeyError:
-			logger.debug(f"'items\' not found in resource {object_type}")
+			logger.debug(f"'items' not found in resource {object_type}")
 			return obj_name_to_id_dict
 
 		for item in items:
@@ -505,12 +548,12 @@ class NetIM(Service):
 		
 		return response
 
-	# def update_device_timezone(self, ...):
-	# timeZone, timeZoneDisplayName
-	# def update_device_location(self, ...):
-	# city, cityDisplayName, regionID, regionIDDisplayName, countryCode, countryCodeDisplayName 
-	# def update_device_coordinate(self, ...):
-	# longitude, latitude
+	### def update_device_timezone(self, ...):
+	### timeZone, timeZoneDisplayName
+	### def update_device_location(self, ...):
+	### city, cityDisplayName, regionID, regionIDDisplayName, countryCode, countryCodeDisplayName 
+	### def update_device_coordinate(self, ...):
+	### longitude, latitude
 
 	# Interface API calls
 	def get_all_device_interfaces(self, device_id):
@@ -527,11 +570,11 @@ class NetIM(Service):
 	# Group and Site API calls
 	def get_all_groups(self, group_type=None):
 		url = f'{self.base_url}groups'
-		if group_type == 'SITE':
+		if group_type == 'Site':
 			url += '?type=Site'
-		elif group_type == 'GROUP':
+		elif group_type == 'Group':
 			url += '?type=Group'
-		elif group_type == None or type == 'ALL':
+		elif group_type == None or type == 'All':
 			pass
 		else:
 			logger.debug(f"Unexpected group type {group_type} specified.")
@@ -539,49 +582,107 @@ class NetIM(Service):
 		groups_json = self._get_json_from_resource(url)
 		return groups_json
 	
+	def get_group(self, group_id):
+		url = f'{self.base_url}groups/{group_id}'
+		group_json = self._get_json_from_resource(url)
+		return group_json
+
 	def _get_group_id_map(self, use_cache=False):
 		return self._get_object_id_map('groups', 'id', 'name', use_cache)
 
-	#def get_group_id_by_group_name(self, group_name):
-	#def get_parent_groups_of_group(self, group_id):
-	#def get_sub_groups_of_group(self, group_id):
-	#def get_devices_in_group(self, group_id):
-	#def get_links_in_group(self, group_id):
-	#def get_custom_attribute_values_of_group(self, group_id):
+	def get_group_id_by_group_name(self, group_name, use_cache=False):
+		group_map = self._get_group_id_map(use_cache)
+		if group_name in group_map:
+			return group_map[group_name]
+		else:
+			return -1
 
-	def add_group_and_members(self, group_name, group_description="", group_type='ALL', add_groups = [], device_ids = []):
-		if group_type not in ['ALL', 'SITE', 'GROUP']:
+	###def get_parent_groups_of_group(self, group_id):
+	###def get_subgroups_of_group(self, group_id):
+	###def get_devices_in_group(self, group_id):
+	###def get_links_in_group(self, group_id):
+	###def get_custom_attribute_values_of_group(self, group_id):
+
+	def add_group(self, group_name, group_description="", group_type='Subnet'):
+
+		if group_type not in ['User', 'Subnet']:
 			logger.debug(f'Group type {group_type} not provided as expected.')
-			logger.debug(f'Please provide group type of ALL, SITE, or GROUP')
+			logger.debug(f'Please provide group type of User or Subnet')
 			return
 
 		url = f'{self.base_url}groups'
-		body_json = {
-			'name': group_name,
-			'description': group_description,
-			'type': group_type,
-			'addDevices': device_ids,
-			'addGroups': add_groups
-			}
+		group = CreatableGroup(name=group_name, description=group_description, type=group_type)
+
 		extra_headers = {}
 		extra_headers['Content-Type'] = 'application/json'
 		extra_headers['Accept'] = 'application/json'
 
 		try:
-			response = self.service.conn.request('POST', url, body=dumps(body_json),
+			response = self.service.conn.request('POST', url, body=dumps(group, cls=DefinitionJSONEncoder),
 				extra_headers=extra_headers)
 		except:
 			logger.info(f"Exception while deleting data from {url}")
 			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		
+		return
+
+	def add_devices_to_group(self, group_name, device_ids=[]):
+
+		### 
 
 		return
 
-	#def delete_group_by_id(self, group_id):
-	#def delete_group(self, group_name):
-	#def update_group_membership(self, add_group_ids, add_devices, remove_group_ids, remove_devices):
-	#def delete_all_groups(self, group_type):
-	
+	def remove_devices_from_group(self, group_name, device_ids=[]):
 
+		###
+
+		return
+
+	def delete_all_groups(self, group_type):
+		
+		if group_type not in ['ALL', 'SITE', 'GROUP']:
+			return
+
+		url = f'{self.base_url}groups'
+		
+		final_url = url + '?type=' + group_type + '&confirmDeleteAll=false'
+
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+
+		try:
+			response = self.service.conn.request('DELETE', final_url, extra_headers=extra_headers)
+		except:
+			logger.info(f"Exception while deleting groups using {final_url}")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		
+		return 
+
+	def delete_group_by_id(self, group_id):
+		url = f'{self.base_url}groups/{group_id}'
+
+		response = None
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+
+		try:
+			response = self.service.conn.request('DELETE', url, extra_headers=extra_headers)
+		except:
+			logger.info(f"Exception while deleting data from {url}")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		
+		return 
+
+	def delete_group(self, group_name):
+		group_id = int(self.get_group_id_by_group_name(group_name))
+		if group_id >= 0:
+			self.delete_group_by_id(group_id)
+		else:
+			logger.DEBUG(f'Group name {group_name} not found')
+		return
+		
 	# Location API calls
 	def get_all_countries(self):
 		url = f'{self.base_url}countries'
@@ -905,6 +1006,7 @@ class NetIM(Service):
 		response = self._get_json_from_resource(url)
 		return response
 
+	### Yet to be implemented
 	# Metric API calls
 
 	#NETIM_METRIC_CLASS_TO_METRIC = {

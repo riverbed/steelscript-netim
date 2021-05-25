@@ -7,13 +7,14 @@ import argparse
 import getpass
 import logging
 import sys
+import time
 
 logging.captureWarnings(True)
 logger = logging.getLogger(__name__)
 
 # Uncomment one of the following lines to review logging details interactively
 #logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 TEST_CUSTOM_ATTRIBUTE = 'Test Custom Attribute'
 TEST_CUSTOM_ATTRIBUTE_DESCRIPTION = 'Test attribute created on device'
@@ -48,6 +49,12 @@ def check(success, check2=""):
 	return
 
 def test_custom_attributes_apis(netim):
+	prompt(f"Getting all devices from NetIM")	
+	netim_devices_json = netim.get_all_devices()
+	netim_devices = []
+	if netim_devices_json != None and 'items' in netim_devices_json:
+		netim_devices = netim_devices_json['items']
+
 	prompt(f"Adding custom attribute '{TEST_CUSTOM_ATTRIBUTE}' to all devices",
 		"Under Configure / Device Manager, click on a device name, and choose Browse in the tabs that load." \
 		" Custom Attributed are listed in the 2nd section.")
@@ -98,6 +105,12 @@ def test_custom_attributes_apis(netim):
 
 def test_devices_apis(netim):
 
+	prompt(f"Getting all devices from NetIM")	
+	netim_devices_json = netim.get_all_devices()
+	netim_devices = []
+	if netim_devices_json != None and 'items' in netim_devices_json:
+		netim_devices = netim_devices_json['items']
+
 	prompt(f"Adding test device {TEST_DEVICE_NAME} to NetIM")
 	try:
 		response = netim.add_device_without_detail(TEST_DEVICE_NAME, TEST_DEVICE_ADDRESS)
@@ -127,9 +140,36 @@ def test_groups_apis(netim):
 	prompt(f"Adding group {TEST_GROUP_NAME} to NetIM")
 	try:
 		response = netim.add_group(TEST_GROUP_NAME)
+		time.sleep(3)
 	except:
 		logger.info("Exception when adding device")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	group_id = -1
+	try:
+		group_id = netim.get_group_id_by_group_name(TEST_GROUP_NAME)
+	except TypeError as e:
+		logger.info(f"TypeError: {e}")
+	except:
+		logger.info("Exception when getting group ID by name")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	check(bool(group_id != -1), f"Group {TEST_GROUP_NAME} should be visible in Search.")
+
+	prompt(f"Delete group {TEST_GROUP_NAME} from NetIM")
+	try:
+		netim.delete_group(TEST_GROUP_NAME)
+		time.sleep(3)
+	except:
+		logger.info("Exception when deleting group name")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	group_id = -1
+	try:
+		group_id = netim.get_group_id_by_group_name(TEST_GROUP_NAME)
+	except:
+		logger.info("Exception when getting group ID by name")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	check(bool(group_id == -1), f"Group {TEST_GROUP_NAME} should no longer be visible in Search.")
 
 	return
 
@@ -159,15 +199,11 @@ def main():
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
 		return
 
-	prompt(f"Getting all devices from NetIM {args.netim_hostname}")	
-	netim_devices_json = netim.get_all_devices()
-	netim_devices = []
-	if netim_devices_json != None and 'items' in netim_devices_json:
-		netim_devices = netim_devices_json['items']
 
-	#test_devices_apis(netim)
-	#test_custom_attributes_apis(netim)
+	test_devices_apis(netim)
+	test_custom_attributes_apis(netim)
 	test_groups_apis(netim)
+	#test_locations_apis(netim)
 
 	return
 
