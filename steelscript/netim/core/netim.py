@@ -44,6 +44,16 @@ class Definition(object):
 
 		return attrs
 
+	def __str__(self):
+		output = ''
+		class_name = str(self.__class__).split('.')[-1].replace("'>","")
+		for attribute, value in self.attributes.items():
+			output += f"{class_name} - {attribute}:{value}"
+		return output
+
+	def __repr__(self):
+		return self.__str__()
+
 #-----
 
 class ObjectTypeCreateUpdate(Definition):
