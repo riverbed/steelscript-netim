@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Uncomment one of the following lines to review logging details interactively
 #logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 TEST_CUSTOM_ATTRIBUTE = 'Test Custom Attribute'
 TEST_CUSTOM_ATTRIBUTE_DESCRIPTION = 'Test attribute created on device'
