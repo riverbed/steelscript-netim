@@ -57,7 +57,7 @@ def check(success, check=""):
 
 	return
 
-def test_custom_attributes_apis(netim, netim_devices):
+def test_custom_attributes_apis(netim, test_device_id, test_group_id):
 
 	prompt(f"Adding Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}' to NetIM")
 	attribute_id = netim.get_custom_attribute_id_by_name(TEST_CUSTOM_ATTRIBUTE)
@@ -69,46 +69,100 @@ def test_custom_attributes_apis(netim, netim_devices):
 	prompt("Providing NetIM time to process ...")
 	time.sleep(TEST_WAIT)
 
-	prompt(f"Checking Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}')
-
+	prompt(f"Checking that Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}' exists on NetIM.")
+	try:
+		attribute_id = netim.get_custom_attribute_id_by_name(TEST_CUSTOM_ATTRIBUTE)
+	except:
+		logger.debug("Exception when checking Custom Attribute exists on NetIM")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
+	check(bool(int(attribute_id) >= 0))
 
 	prompt(f"Adding Custom Attribute Values to Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}'")
-	updated_device_ids = [netim_device['id'] for netim_device in netim_devices]
 	try:
 		response = netim.add_custom_attribute_values(TEST_CUSTOM_ATTRIBUTE, TEST_CUSTOM_ATTRIBUTE_VALUE, 
-			device_ids=updated_device_ids)
+			device_ids=[test_device_id])
 	except AttributeError as e:
 		logger.debug(f"AttributeError: {e}")
+		raise
 	except NameError as e:
 		logger.debug(f"NameError: {e}")
+		raise
 	except:
-		logger.debug("Exception when importing Custom Attribute Values for devices")
+		logger.info(f"Exception when importing Custom Attribute Values for device '{device_id}'")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
+
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	prompt(f"Checking that Custom Attribute Value '{TEST_CUSTOM_ATTRIBUTE_VALUE}' is set on NetIM.")
+	cust_attr_value_id = -1
+	try:
+		cust_attr_value_id = netim.get_custom_attribute_value_id_by_name_and_value(TEST_CUSTOM_ATTRIBUTE, 
+			TEST_CUSTOM_ATTRIBUTE_VALUE)
+	except:
+		logger.info("Exception when checking Custom Attribute Values for devices")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
+	check(bool(int(cust_attr_value_id) >= 0))
 
 	prompt(f"Changing Custom Attribute Value in Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}'")
-	updated_device_ids = [netim_device['id'] for netim_device in netim_devices]
 	try:
 		response = netim.update_custom_attribute_value(TEST_CUSTOM_ATTRIBUTE, TEST_CUSTOM_ATTRIBUTE_VALUE,
-			TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED)
+			TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED, device_ids=[test_device_id])
 	except AttributeError as e:
 		logger.debug(f"AttributeError: {e}")
+		raise
 	except NameError as e:
 		logger.debug(f"NameError: {e}")
+		raise
 	except:
 		logger.debug("Exception when importing Custom Attribute Values for devices")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
 
-	prompt(f"Deleting Custom Attribute Values for Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}'")
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	prompt(f"Checking that Custom Attribute Value '{TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED}' is set on NetIM.")
+	cust_attr_value_id = -1
+	try:
+		cust_attr_value_id = netim.get_custom_attribute_value_id_by_name_and_value(TEST_CUSTOM_ATTRIBUTE, 
+			TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED)
+	except:
+		logger.info("Exception when checking Custom Attribute Values for devices")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
+	check(bool(int(cust_attr_value_id) >= 0))
+
+	prompt(f"Deleting Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}'")
 	try:
 		response = netim.delete_custom_attribute(TEST_CUSTOM_ATTRIBUTE)
 	except AttributeError as e:
 		logger.debug(f"AttributeError: {e}")
+		raise
 	except NameError as e:
 		logger.debug(f"NameError: {e}")
+		raise
 	except:
 		logger.info("Exception when deleting Custom Attribute Values for devices")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-	
+		raise
+
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	prompt(f"Checking that Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}' has been deleted.")
+	attribute_id = -1
+	try:
+		attribute_id = netim.get_custom_attribute_id_by_name(TEST_CUSTOM_ATTRIBUTE)
+	except:
+		logger.info("Exception when checking Custom Attribute Values for devices")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
+	check(bool(attribute_id == -1))
+
 	return	
 
 def test_devices_and_groups_apis(netim, netim_devices):
@@ -205,7 +259,10 @@ def test_devices_and_groups_apis(netim, netim_devices):
 		logger.info(f"Exception when getting devices for Group '{TEST_GROUP_NAME}'")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
 	check(bool(len(group_devices) == 0), "")
-			
+	
+	# # # TEST CUSTOM ATTRIBUTES
+	test_custom_attributes_apis(netim, device_id, group_id)
+		
 	# DELETE GROUP AND CONFIRM
 
 	prompt(f"Delete Group '{TEST_GROUP_NAME}' from NetIM")
@@ -317,9 +374,7 @@ def main():
 	prompt("Beginning test execution ...")
 	prompt("")
 
-	#test_add_delete_device(netim)
 	test_devices_and_groups_apis(netim, netim_devices)
-	test_custom_attributes_apis(netim, netim_devices)
 	#test_locations_apis(netim)
 
 	return
