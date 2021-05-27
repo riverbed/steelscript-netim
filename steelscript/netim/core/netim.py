@@ -12,7 +12,7 @@ import types
 from steelscript.common.service import Service
 from steelscript.common.exceptions import RvbdHTTPException
 
-__all__ = ['CustomAttributeDefinitionCreate', 'Devices', 'ModifiableAlertProfileBean', 'ModifiablePollingProfileBean', \
+__all__ = ['CustomAttributeDefinitionCreate', 'ModifiableAlertProfileBean', 'ModifiablePollingProfileBean', \
 	'Metric', 'NetIM', 'NewCustomAttributeValue']
 
 logging.captureWarnings(True)
@@ -132,7 +132,112 @@ class NewCustomAttributeValue(Definition):
 		self.attributeId = attribute_id
 		self.value = value
 
-class Devices(Definition):
+class ModifiableDeviceAccessInfoBean(Definition):
+	def __init__(self, device_name, access_address, description='', active=True, device_driver='', 
+		active_cli=True, active_mib=True, active_wmi=False, active_metric=False, active_aws=False,
+		has_cli_password=True, has_cli_privpassword=False,
+		cli_username='', cli_loginscript='InitPrompt', cli_accessmethod=3, cli_password=None, cli_privpassword=None,
+		snmp_version=1,  snmp_communitystring=None,
+		snmpv3_securitylevel=None, snmpv3_username=None, snmpv3_context=None, 
+		snmpv3_authprotocol=None, snmpv3_privprotocol=None,
+		snmpv3_password=None, snmpv3_privpassword=None, snmpv3_authpassword=None,
+		wmi_username="none", wmi_domain="none", wmi_password=None,
+		aws_instanceid="none", aws_accesskeyid="none", aws_region="none", aws_secretaccesskey="none",
+		extmgmt_srvtype=None, extmgmt_srvid=None, extmgmt_srvdevid=None):
+
+		# cli_accessmethod - 0: Not Set, 1: Telnet, 2: SSHv1, 3: SSHv2
+		# cli_snmpversion - 1000: Not Set, 0: v1, 1: v2c, 3: SNMPv3
+
+		# Device details
+		self.name = device_name
+		self.displayName = device_name
+		self.accessAddress = access_address
+		self.deviceDriver = device_driver
+		self.active = active
+
+		# CLI details
+		self.activeCLIConfigCollection = active_cli
+		self.cliUsername = cli_username
+		self.cliLoginScript = cli_loginscript
+		self.cliAccessMethod = cli_accessmethod
+		if cli_password != None:
+			self.cliPassword = cli_password
+		if cli_privpassword != None:
+			self.cliPrivPassword = cli_privpassword
+
+		# SNMP details
+		self.activeMIBConfigCollection = active_mib
+		self.activeMetricsCollection = active_metric
+		self.snmpVersion = snmp_version
+		if snmp_communitystring != None:
+			self.snmpCommunityString = snmp_communitystring
+
+		# SNMPv3 details
+		if snmpv3_securitylevel != None:
+			self.snmpV3SecurityLevel = snmpv3_securitylevel
+		if snmpv3_username != None:
+			self.snmpV3Username = snmpv3_username
+		if snmpv3_context != None:
+			self.snmpV3Context = snmpv3_context
+		if snmpv3_authprotocol != None:
+			self.snmpV3AuthProtocol = snmpv3_authprotocol
+		if snmpv3_privprotocol != None:
+			self.snmpV3PrivacyProtocol = snmpv3_privprotocol
+		if snmpv3_password != None:
+			self.snmpV3Password = snmpv3_password
+		if snmpv3_privpassword != None:
+			self.snmpV3PrivacyPassword = snmpv3_privpassword
+		if snmpv3_authpassword != None:
+			self.snmpV3AuthPassword = snmpv3_authpassword
+
+		# WMI details
+		self.activeWMIConfigCollection = active_wmi
+		self.wmiUsername = wmi_username
+		self.wmiDomain = wmi_domain
+		if wmi_password != None:
+			self.wmiPassword = wmi_password
+
+		# AWS details
+		self.activeAWSConfigCollection = active_aws
+		self.awsInstanceId = aws_instanceid
+		self.awsAccessKeyId = aws_accesskeyid
+		self.awsRegion = aws_region
+		self.awsSecretAccessKey = aws_secretaccesskey
+
+		# External management server
+		if extmgmt_srvtype != None:
+			self.extMgmtSrvType = extmgmt_srvtype
+		if extmgmt_srvid != None:
+			self.extMgmtSrvId = extmgmt_srvid
+		if extmgmt_srvdevid != None:
+			self.extMgmtSrvDevId = extmgmt_srvdevid
+
+class ModifiableDevice(Definition):
+	def __init__(self, name, display_name, device_name, access_address, device_access_info, description='',
+		city=None, region_id=None, country_code=None, time_zone=None, time_zone_display_name=None, 
+		links=None):
+
+		self.name = name
+		self.displayName = display_name
+		self.deviceName = device_name
+		self.accessAddress = access_address
+		self.description = description
+		self.deviceAccessInfo = device_access_info
+
+		if city != None:
+			self.city = city
+		if region_id != None:
+			self.region_id = region_id
+		if country_code != None:
+			self.country_code = country_code
+		if time_zone != None:
+			self.time_zone = time_zone
+		if time_zone_display_name != None:
+			self.time_zone_display_name = time_zone_display_name
+		if links != None:
+			self.links = links
+
+class ModifiableDeviceList(Definition):
 	
 	def __init__(self, device_list):
 
@@ -142,44 +247,25 @@ class Devices(Definition):
 			if 'device_name' not in device_entry or 'access_address' not in device_entry:
 				continue
 
+			# Required parameters for each device entry in device list
 			device_name = device_entry['device_name']
 			access_address = device_entry['access_address']
 
-			item = {}
-			item['name'] = device_name
-			item['displayName'] = device_name
-			item['deviceName'] = device_name
-			item['accessAddress'] = access_address
-			item['description'] = "None" if 'description' not in device_entry else device_entry['description']
-			deviceAccessInfo = {}
-			deviceAccessInfo["name"] = device_name
-			deviceAccessInfo["displayName"] = device_name
-			deviceAccessInfo["active"] = True if 'active' not in device_entry else device_entry['active']
-			deviceAccessInfo["activeCLIConfigCollection"] = True
-			deviceAccessInfo["activeMIBConfigCollection"] = True
-			deviceAccessInfo["activeWMIConfigCollection"] = False
-			deviceAccessInfo["activeMetricsCollection"] = False
-			deviceAccessInfo["activeAWSConfigCollection"] = False
-			deviceAccessInfo["deviceDriver"] = '' if 'device_driver' not in device_entry else device_entry['device_driver']
-			deviceAccessInfo["accessAddress"] = access_address
-			deviceAccessInfo["cliUsername"] = '' if 'cli_username' not in device_entry else device_entry['cli_username']
-			deviceAccessInfo["hasCliPassword"] = True
-			deviceAccessInfo["hasCliPrivPassword"] = False
-			deviceAccessInfo["cliLoginScript"] = "InitPrompt"
-			deviceAccessInfo["cliAccessMethod"] = 3
-			deviceAccessInfo["snmpVersion"] = 1
-			deviceAccessInfo["hasSnmpCommunityString"] = True
-			deviceAccessInfo["hasSnmpV3AuthPassword"] = False
-			deviceAccessInfo["hasSnmpV3PrivacyPassword"] = False
-			deviceAccessInfo["wmiUsername"] = "none"
-			deviceAccessInfo["wmiDomain"] = "none"
-			deviceAccessInfo["awsInstanceId"] = "none"
-			deviceAccessInfo["awsAccessKeyId"] = "none"
-			deviceAccessInfo["awsRegion"] = "none"
-			deviceAccessInfo["awsSecretAccessKey"] = "none"
-			item["deviceAccessInfo"] = deviceAccessInfo
+			# Optional parameters for each device entry in device list
+			# Update here and when device access info bean is crecreated to add supported options
+			description = "None" if 'description' not in device_entry else device_entry['description']
+			device_driver = '' if 'device_driver' not in device_entry else device_entry['device_driver'] 
+			cli_username = '' if 'cli_username' not in device_entry else device_entry['cli_username']
 
-		self.items.append(item)
+			# Create device
+			device_access_info = ModifiableDeviceAccessInfoBean(device_name, access_address, description=description,
+				device_driver=device_driver, cli_username=cli_username)
+			device = ModifiableDevice(name=device_name, display_name=device_name, device_name=device_name, 
+				access_address=access_address, device_access_info=device_access_info)
+
+			self.items.append(device)
+
+		# self.meta = total, count, limit, offset, next_offset, prev_offset
 
 class HealthEnum(Definition):
 	def __init__(self, health_value, health_name):
@@ -290,19 +376,20 @@ class NetIM(Service):
 
 	# Generic API calls for resource URLs; prefer the direct calls, but allows for quick pickup of new API calls
 	def _get_json(self, url):
+		json_dict = None
 		try:
 			json_dict = self.service.conn.json_request('GET', url)
 			if json_dict == None:
 				logger.info(f"Exception while getting data from {url}:")
-				return None
+				raise
 		except AttributeError as e:
 			logger.info(f"Exception while getting data from {url}:")
 			logger.debug(f"Attribute error: {e}")
-			return None
+			raise
 		except:
 			logger.info(f"Exception while getting data from {url}:")
 			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			return None
+			raise
 
 		return json_dict
 
@@ -320,7 +407,8 @@ class NetIM(Service):
 
 		# Handle error in return gracefully so script can continue
 		if json_dict == None:
-			return None
+			### raise exception?
+			return json_dict
 
 		# If JSON dict is first of a series of paged data, loop through getting additional pages
 		if 'meta' in json_dict:
@@ -395,9 +483,9 @@ class NetIM(Service):
 		return obj_name_to_id_dict
 
 	# Archive API calls
-	###def get_archives_by_device_id(self, device_id):
-	###def get_archive_by_id(self, archive_id):
-	###def get_archive_file_by_id(self, archive_id):
+	### def get_archives_by_device_id(self, device_id):
+	### def get_archive_by_id(self, archive_id):
+	### def get_archive_file_by_id(self, archive_id):
 
 	# Device API calls	
 	def get_device_id_by_device_name(self, device_name):
@@ -472,6 +560,7 @@ class NetIM(Service):
 		return self._get_object_id_map('devices', 'deviceAccessInfoId', 'sysName', 'deviceName', use_cache)	
 
 	def _add_devices_from_definition(self, devices):
+
 		url = f'{self.base_url}devices'
 		response = None
 		try:
@@ -487,21 +576,42 @@ class NetIM(Service):
 			logger.info(f"Exception while posting data to {url}")
 
 		if response is not None:
-			if response.status_code >=200 and response.status_code < 300:
+			if response.status_code == 207:
+				logger.info(f"Response from {url} returned in multi-response format.")
+				response_json = response.json()
+				responses = response_json['responses']
+				if 'responses' in response_json:
+					for response in responses:
+						status=''
+						if 'status' in response:
+							status = response['status']
+						status_info=''
+						if 'statusInfo' in response:
+							status_info = response['statusInfo']
+						logger.info(f"Device status: {status}:{status_info}")
+			elif response.status_code >=200 and response.status_code < 300:
 				resp_text = response.text
 				logger.info(f"Response: {resp_text}")
 			else:
 				logger.info(f"Error while adding devices. Status code: {response.status_code}")
 				logger.debug(f"Check that device names and access addresses do not match existing devices.")
+				raise Exception('Error while adding devices')
 		else:
 			logger.debug(f"Unable to retrieve resource {url}.")
+			raise Exception(f'Unable to retrieve data from {url}')
 
 		return response
 
 	def add_device_without_detail(self, device_name, access_address):
 
+		device_id = int(self.get_device_id_by_device_name(device_name))
+		if device_id > 0:
+			logger.info(f"Device name {device_name} already exists in NetIM.")
+			logger.info(f"Delete and re-add device or update relevant device information.")
+			raise Exception(f'Device name {device_name} does not exist in NetIM.')
+
 		device_list=[{'device_name':device_name, 'access_address':access_address}]
-		devices = Devices(device_list)
+		devices = ModifiableDeviceList(device_list)
 		response = self._add_devices_from_definition(devices)
 
 		return response
@@ -565,20 +675,21 @@ class NetIM(Service):
 		url = f'devices/{device_id}/interfaces'
 		return self._get_object_id_map(url, 'name', 'id', use_cache)
 
-	###def get_device_interfaces_by_device_id(self, device_id):
+	### def get_device_interfaces_by_device_id(self, device_id):
 
 	# Group and Site API calls
 	def get_all_groups(self, group_type=None):
 		url = f'{self.base_url}groups'
-		if group_type == 'Site':
+		if group_type == 'Site' or group_type == 'Subnet':
 			url += '?type=Site'
-		elif group_type == 'Group':
+		elif group_type == 'Group' or group_type == 'User':
 			url += '?type=Group'
 		elif group_type == None or type == 'All':
 			pass
 		else:
 			logger.debug(f"Unexpected group type {group_type} specified.")
-			return None
+			raise Exception(f"Unexpected group type {group_type} specified.")
+
 		groups_json = self._get_json_from_resource(url)
 		return groups_json
 	
@@ -597,11 +708,34 @@ class NetIM(Service):
 		else:
 			return -1
 
-	###def get_parent_groups_of_group(self, group_id):
-	###def get_subgroups_of_group(self, group_id):
-	###def get_devices_in_group(self, group_id):
-	###def get_links_in_group(self, group_id):
-	###def get_custom_attribute_values_of_group(self, group_id):
+	def get_devices_in_group(self, group_name, include_subgroups=False):
+
+		group_id = int(self.get_group_id_by_group_name(group_name))
+		if group_id == -1:
+			raise Exception(f"Group {group_name} not found in NetIM")
+		
+		devices = []
+		url = f'{self.base_url}groups/{group_id}/devices'
+
+		if include_subgroups == True:
+			url += '?traverseSubGroups=true'
+
+		try:
+			devices_json = self._get_json_from_resource(url)
+			if 'items' in devices_json:
+				devices = devices_json['items']
+		except:
+			logger.info(f"Unable to retrieve devices from Group ID {group_id}")
+			raise
+
+		return devices
+
+	### def get_parent_groups_of_group(self, group_id):
+	### def get_subgroups_of_group(self, group_id):
+	
+
+	### def get_links_in_group(self, group_id):
+	### def get_custom_attribute_values_of_group(self, group_id):
 
 	def add_group(self, group_name, group_description="", group_type='Subnet'):
 
@@ -628,15 +762,130 @@ class NetIM(Service):
 
 	def add_devices_to_group(self, group_name, device_ids=[]):
 
-		### 
+		if len(device_ids) == 0:
+			raise Exception(f"No devices are being added to group")
+
+		group_id = int(self.get_group_id_by_group_name(group_name))
+		if group_id < 0:
+			logger.info(f"Group name '{group_name}' not found in NetIM")
+			raise Exception(f"Group name '{group_name}' not found in NetIM")
+		
+		url = f'{self.base_url}groups/{group_id}'
+
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+
+		group_update = ModifiableGroup(group_name, add_devices=device_ids)
+		try:
+			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
+				extra_headers=extra_headers)
+			if response is not None:
+				if response.status_code < 200 or response.status_code > 300:
+					logger.debug(f"Unable to add devices to group using {url}. " + \
+						 "Status code: {response.status_code}")
+			else:
+				logger.debug(f"Unable to add devices to group using {url}. No response from server.")
+		except:
+			logger.info(f"Exception while adding devices to {url}")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
 
 		return
 
 	def remove_devices_from_group(self, group_name, device_ids=[]):
 
-		###
+		group_id = int(self.get_group_id_by_group_name(group_name))
+		if group_id < 0:
+			logger.info(f"Group name '{group_name}' not found in NetIM")	
+			return
 
+		url = f'{self.base_url}groups/{group_id}'
+
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+
+		group_update = ModifiableGroup(group_name, remove_devices=device_ids)
+		try:
+			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
+				extra_headers=extra_headers)
+			if response is not None:
+				if response.status_code < 200 or response.status_code > 300:
+					logger.debug(f"Unable to add devices to group using {url}. " + \
+						 "Status code: {response.status_code}")
+			else:
+				logger.debug(f"Unable to add devices to group using {url}. No response from server.")
+		except:
+			logger.info(f"Exception while adding devices to {url}")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		
 		return
+
+	def add_group_to_hierarchy(self, group_name, parent_group_name):
+
+		group_id = int(self.get_group_id_by_group_name(group_name))
+		if group_id < 0:
+			logger.info(f"Group name '{group_name}' not found in NetIM")	
+			return
+		parent_group_id = int(self.get_group_id_by_group_name(parent_group_name))
+		if parent_group_id < 0:
+			logger.info(f"Gropu name '{parent_group_name}' not found in NetIM")
+			return
+
+		url = f'{self.base_url}groups/{parent_group_id}'
+
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+
+		group_update = ModifiableGroup(parent_group_name, add_groups=[group_id])
+		try:
+			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
+				extra_headers=extra_headers)
+			if response is not None:
+				if response.status_code < 200 or response.status_code > 300:
+					logger.debug(f"Unable to add group to parent group using {url}. " + \
+						 "Status code: {response.status_code}")
+			else:
+				logger.debug(f"Unable to add group to parent group using {url}. No response from server.")
+		except:
+			logger.info(f"Exception while adding devices to {url}")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		
+
+	def remove_group_from_hierarchy(self, group_name, parent_group_name):
+
+		group_id = int(self.get_group_id_by_group_name(group_name))
+		if group_id < 0:
+			logger.info(f"Group name '{group_name}' not found in NetIM")	
+			return
+		parent_group_id = int(self.get_group_id_by_group_name(parent_group_name))
+		if parent_group_id < 0:
+			logger.info(f"Gropu name '{parent_group_name}' not found in NetIM")
+			return
+
+		url = f'{self.base_url}groups/{parent_group_id}'
+
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+
+		group_update = ModifiableGroup(parent_group_name, remove_groups=[group_id])
+		try:
+			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
+				extra_headers=extra_headers)
+			if response is not None:
+				if response.status_code < 200 or response.status_code > 300:
+					logger.debug(f"Unable to remove group from parent group using {url}. " + \
+						 "Status code: {response.status_code}")
+			else:
+				logger.debug(f"Unable to remove group from parent group using {url}. No response from server.")
+		except:
+			logger.info(f"Exception while adding devices to {url}")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		
+		return
+
 
 	def delete_all_groups(self, group_type):
 		
@@ -715,22 +964,22 @@ class NetIM(Service):
 		return cities_json
 
 	# Host API calls
-	###def get_all_hosts(self):
-	###def get_host_by_id(self, host_id):
-	###def get_connected_interface_by_host_id(self, host_id):
+	### def get_all_hosts(self):
+	### def get_host_by_id(self, host_id):
+	### def get_connected_interface_by_host_id(self, host_id):
 
 	# Links API calls
-	###def get_all_links(self):
-	###def get_link_by_id(self):
-	###def delete_link_by_id(self):
-	###def patch_link_by_id(self):
-	###def add_link(self, link_info):
-	###def delete_link_by_id(self, link_id):
-	###def patch_link(self, link_id, link_info):
+	### def get_all_links(self):
+	### def get_link_by_id(self):
+	### def delete_link_by_id(self):
+	### def patch_link_by_id(self):
+	### def add_link(self, link_info):
+	### def delete_link_by_id(self, link_id):
+	### def patch_link(self, link_id, link_info):
 
 	# Metric Classes API calls
-	###def get_metric_classes(self):
-	###def get_metric_class_by_id(self, metric_class_id):
+	### def get_metric_classes(self):
+	### def get_metric_class_by_id(self, metric_class_id):
 
 	# Monitored Path API calls
 	def get_all_monitoredpaths(self):
