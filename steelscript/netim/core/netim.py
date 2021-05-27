@@ -1219,31 +1219,43 @@ class NetIM(Service):
 
 		return
 
-	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value):
-
+	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value, device_ids=None):
+		###
 		attribute_id = int(self.get_custom_attribute_value_id_by_name_and_value(cust_attr_name, old_value))
 		if attribute_id >= 0:
 			url = f'{self.base_url}custom-attribute-values/{attribute_id}'
 		else:
 			return
 
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+		body = {}
+		body['value'] = new_value
+		#if device_ids != None:
+		#	body['deviceIds'] = device_ids
+
 		try:
-			extra_headers = {}
-			extra_headers['Content-Type'] = 'application/json'
-			extra_headers['Accept'] = 'application/json'
-			body = {}
-			body['value'] = new_value
-			response = self.service.conn.request('PUT', url, body=dumps(body),
-				extra_headers=extra_headers)
+			response = self.service.conn.request('PUT', url, body=dumps(body), extra_headers=extra_headers)
+			if response.status_code >=200 and response.status_code < 300:
+				resp_text = response.text
+				logger.info(f"Response: {resp_text}")
+			else:
+				logger.info(f"Error while adding devices. Status code: {response.status_code}")
+				raise Exception(f"Error in response to {url}: {response}")
 		except RvbdHTTPException as e:
 			logger.debug(f"RvbdHTTPException: {e}")
+			raise
 		except AttributeError as e:
 			logger.debug(f"AttributeError: {e}")
+			raise
 		except NameError as e:
 			logger.debug(f"NameError: {e}")
+			raise
 		except:
 			logger.debug(f"Exception while putting data to {url}:")
 			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+			raise
 
 		return
 

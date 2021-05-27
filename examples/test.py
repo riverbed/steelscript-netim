@@ -285,7 +285,7 @@ def test_devices_and_groups_apis(netim, netim_devices):
 
 	# DELETE DEVICE AND CONFIRM
 	
-	prompt(f"Delete test Device '{TEST_DEVICE_NAME} from NetIM") 
+	prompt(f"Delete test Device '{TEST_DEVICE_NAME}' from NetIM") 
 	try:
 		response = netim.delete_device(TEST_DEVICE_NAME)
 	except:
