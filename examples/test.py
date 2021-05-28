@@ -33,6 +33,8 @@ TEST_CITY_NAME = 'Arlington'
 TEST_REGION_NAME = 'Virginia'
 TEST_COUNTRY_NAME = 'United States of America'
 
+TEST_ARCHIVE_DEVICE = 'MidA-Mgt-Switch01'
+
 def prompt(step1, step2=""):
 	print(step1)
 	if step2 != "":
@@ -110,7 +112,7 @@ def test_custom_attributes_apis(netim, test_device_id, test_group_id):
 	prompt(f"Changing Custom Attribute Value in Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}'")
 	try:
 		response = netim.update_custom_attribute_value(TEST_CUSTOM_ATTRIBUTE, TEST_CUSTOM_ATTRIBUTE_VALUE,
-			TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED, device_ids=[test_device_id])
+			TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED)
 	except AttributeError as e:
 		logger.debug(f"AttributeError: {e}")
 		raise
@@ -130,6 +132,30 @@ def test_custom_attributes_apis(netim, test_device_id, test_group_id):
 	try:
 		cust_attr_value_id = netim.get_custom_attribute_value_id_by_name_and_value(TEST_CUSTOM_ATTRIBUTE, 
 			TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED)
+	except:
+		logger.info("Exception when checking Custom Attribute Values for devices")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
+	check(bool(int(cust_attr_value_id) >= 0))
+
+	prompt(f"Resetting Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}' with Value '{TEST_CUSTOM_ATTRIBUTE_VALUE}'")
+	try:
+		response = netim.reset_custom_attribute_name_and_value(TEST_CUSTOM_ATTRIBUTE, 
+			TEST_CUSTOM_ATTRIBUTE_DESCRIPTION, TEST_CUSTOM_ATTRIBUTE_VALUE, device_ids=[test_device_id], 
+			group_ids=[test_group_id])
+	except:
+		logger.info("Exception when resetting Custom Attribute name and Value")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+		raise
+	
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	prompt(f"Checking that Custom Attribute Value '{TEST_CUSTOM_ATTRIBUTE_VALUE}' is set on NetIM.")
+	cust_attr_value_id = -1
+	try:
+		cust_attr_value_id = netim.get_custom_attribute_value_id_by_name_and_value(TEST_CUSTOM_ATTRIBUTE, 
+			TEST_CUSTOM_ATTRIBUTE_VALUE)
 	except:
 		logger.info("Exception when checking Custom Attribute Values for devices")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
@@ -338,6 +364,23 @@ def test_add_delete_device(netim):
 
 	return
 
+def test_archives_apis(netim, device_name):
+
+	device_id = int(netim.get_device_id_by_device_name(device_name))
+	if device_id < 0:
+		logger.info("Device name '{device_name}' not found in NetIM.")
+		raise Exception("Device name '{device_name}' not found in NetIM.")
+		
+	archives = netim.get_archives_by_device_id(device_id, file_filter='ALL')
+	archive_count = len(archives)
+	prompt(f"Device name '{device_name}' has {archive_count} archive(s).")
+
+	file = netim.get_archive_file_by_id(archives[0]['id'])
+	prompt("The first line in the file in the first archive in the list is:")
+	prompt(file.split('\n')[0])
+
+	return
+
 def main():
 
 	parser = argparse.ArgumentParser(description='Python utility to test SteelScript NetIM')
@@ -356,13 +399,13 @@ def main():
 		netim = NetIM(args.netim_hostname, auth)
 	except RvbdHTTPException as e:
 		logger.debug(f"RvbdHTTPException: {e}")
-		return
+		raise
 	except NameError as e:
 		logger.debug(f"NameError: {e}")
-		return
+		raise
 	except:
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-		return
+		raise
 
 	prompt(f"Getting all devices from NetIM")
 	netim_devices_json = netim.get_all_devices()
@@ -374,6 +417,7 @@ def main():
 	prompt("Beginning test execution ...")
 	prompt("")
 
+	test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
 	test_devices_and_groups_apis(netim, netim_devices)
 	#test_locations_apis(netim)
 

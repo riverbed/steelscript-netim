@@ -407,8 +407,8 @@ class NetIM(Service):
 
 		# Handle error in return gracefully so script can continue
 		if json_dict == None:
-			### raise exception?
-			return json_dict
+			logger.info(f"No response from {resource_url}")
+			raise Exception(f"No response from {resource_url}")
 
 		# If JSON dict is first of a series of paged data, loop through getting additional pages
 		if 'meta' in json_dict:
@@ -483,9 +483,44 @@ class NetIM(Service):
 		return obj_name_to_id_dict
 
 	# Archive API calls
-	### def get_archives_by_device_id(self, device_id):
-	### def get_archive_by_id(self, archive_id):
-	### def get_archive_file_by_id(self, archive_id):
+	def get_archives_by_device_id(self, device_id, file_filter='ALL', file_type='cfg'):
+
+		archives = []
+
+		url = f'{self.base_url}devices/{device_id}/archives'
+		url += f'?fileFilter={file_filter}&fileType={file_type}'
+		response = self._get_json_from_resource(url)
+
+		if 'items' in response:
+			archives = response['items']
+			
+		return archives
+
+	def get_archive_by_id(self, archive_id):
+		
+		url = f'{self.base_url}archives/{archive_id}'
+		response = self._get_json_from_resource(url)
+		return response
+
+	def get_archive_file_by_id(self, archive_id):
+
+		url = f'{self.base_url}archives/{archive_id}/file'
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'text/plain'
+		extra_headers['Accept'] = 'text/plain'
+
+		response_text = None
+		try:
+			response = self.service.conn.request('GET', url, extra_headers)
+		except:
+			logger.info(f"Exception while getting configuration file from {url}")
+		if response is not None:
+			if response.status_code == 200:
+				response_text = response.text
+		else:
+			raise Exception(f"No response from {url}")
+				
+		return response_text
 
 	# Device API calls	
 	def get_device_id_by_device_name(self, device_name):
@@ -676,6 +711,14 @@ class NetIM(Service):
 		return self._get_object_id_map(url, 'name', 'id', use_cache)
 
 	### def get_device_interfaces_by_device_id(self, device_id):
+	### def get_interface(self, interface_id):
+	### def delete_interface(self, interface_id):
+	### def update_interface(self, interface_id):
+	### def get_hosts_on_interface(self, interface_id):
+	### def get_agginterfaces_for_interface(self, interface_id):
+	### def get_subinterfaces_for_interface(self, interface_id):
+	### def get_links_for_interface(self, interface_id):
+	### def get_custom_attribute_values_for_interface(self, interface_id):
 
 	# Group and Site API calls
 	def get_all_groups(self, group_type=None):
@@ -730,12 +773,30 @@ class NetIM(Service):
 
 		return devices
 
-	### def get_parent_groups_of_group(self, group_id):
-	### def get_subgroups_of_group(self, group_id):
-	
+	def get_parent_groups_of_group(self, group_id):
+		url = f'{self.base_url}groups/{group_id}/parent-groups'
+		if type != None:
+			url += f'?type={type}'
+		parent_groups_json = self._get_json_from_resource(url)
+		return parent_groups_json
 
-	### def get_links_in_group(self, group_id):
-	### def get_custom_attribute_values_of_group(self, group_id):
+	def get_subgroups_of_group(self, group_id, type=None):
+		url = f'{self.base_url}groups/{group_id}/sub-groups'
+		if type != None:
+			url += f'?type={type}'
+		subgroups_json = self._get_json_from_resource(url)
+		return subgroups_json
+
+	def get_links_in_group(self, group_id, inc_physical=True, inc_logical=False):
+		url = f'{self.base_url}groups/{group_id}/links'
+		url += f'?incPhysical={inc_physical}&incLogical={inc_logical}'
+		links_json = self._get_json_from_resource(url)
+		return links_json
+
+	def get_custom_attribute_values_of_group(self, group_id):
+		url = f'{self.base_url}groups/{group_id}/custom-attribute-values'
+		custom_attribute_values_json = self._get_json_from_resource(url)
+		return custom_attribute_values_json
 
 	def add_group(self, group_name, group_description="", group_type='Subnet'):
 
@@ -964,8 +1025,16 @@ class NetIM(Service):
 		return cities_json
 
 	# Host API calls
-	### def get_all_hosts(self):
-	### def get_host_by_id(self, host_id):
+	def get_all_hosts(self, detected_ips_only=False):
+		url = f'{self.base_url}hosts'
+		hosts_json = self._get_json_from_resource(url)
+		return hosts_json
+
+	def get_host_by_id(self, host_id):
+		url = f'{self.base_url}hosts/{host_id}'
+		host_json = self._get_json_from_resource(url)
+		return host_json
+
 	### def get_connected_interface_by_host_id(self, host_id):
 
 	# Links API calls
@@ -1159,7 +1228,7 @@ class NetIM(Service):
 		attribute_id = int(self.get_custom_attribute_id_by_name(name))
 		if attribute_id < 0:
 			logger.info(f"Custom attribute {name} not found")
-			return
+			raise Exception(f"Custom Attribute '{name}' not found in NetIM")
 		url = f'{self.base_url}custom-attributes/{attribute_id}'
 
 		response = None
@@ -1217,23 +1286,20 @@ class NetIM(Service):
 			logger.debug(f"Exception while getting data from {url}:")
 			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
 
-		return
+		return response
 
-	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value, device_ids=None):
-		###
+	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value):
 		attribute_id = int(self.get_custom_attribute_value_id_by_name_and_value(cust_attr_name, old_value))
 		if attribute_id >= 0:
 			url = f'{self.base_url}custom-attribute-values/{attribute_id}'
 		else:
-			return
+			raise Exception(f"Custom attribute '{cust_attr_name}' not found in NetIM.")
 
 		extra_headers = {}
 		extra_headers['Content-Type'] = 'application/json'
 		extra_headers['Accept'] = 'application/json'
 		body = {}
 		body['value'] = new_value
-		#if device_ids != None:
-		#	body['deviceIds'] = device_ids
 
 		try:
 			response = self.service.conn.request('PUT', url, body=dumps(body), extra_headers=extra_headers)
@@ -1241,7 +1307,7 @@ class NetIM(Service):
 				resp_text = response.text
 				logger.info(f"Response: {resp_text}")
 			else:
-				logger.info(f"Error while adding devices. Status code: {response.status_code}")
+				logger.info(f"Error while updating custom attribute value. Status code: {response.status_code}")
 				raise Exception(f"Error in response to {url}: {response}")
 		except RvbdHTTPException as e:
 			logger.debug(f"RvbdHTTPException: {e}")
@@ -1253,12 +1319,50 @@ class NetIM(Service):
 			logger.debug(f"NameError: {e}")
 			raise
 		except:
-			logger.debug(f"Exception while putting data to {url}:")
+			logger.info(f"Exception while putting data to {url}:")
 			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
 			raise
 
 		return
 
+	def reset_custom_attribute_name_and_value(self, name, description, value, 
+		device_ids=[], interface_ids=[], link_ids=[], group_ids=[], test_ids=[]):
+
+		# Delete existing Custom Attribute
+		try:
+			self.delete_custom_attribute(name)
+		except:
+			attribute_id = int(self.get_attribute_id_by_name(name))
+			if attribute_id >= 0:
+				raise Exception(f"Custom Attribute '{name}' deletion failed")
+			
+		# Add Custom Attribute with appropriate types
+		try:
+			types = []
+			if len(device_ids) > 0:
+				types.append('DEVICE')
+			if len(interface_ids) > 0:
+				types.append('INTERFACE')
+			if len(link_ids) > 0:
+				types.append('LINK')
+			if len(group_ids) > 0:
+				types.append('GROUP')
+			if len(test_ids) > 0:
+				types.append('TEST')
+			self.add_custom_attribute(name, description, types)
+		except:
+			logger.info(f"Exception while adding Custom Attribute")
+			raise
+
+		# Add Custom Attribute Values
+		try:
+			self.add_custom_attribute_values(name, value, device_ids=device_ids, interface_ids=interface_ids,
+				link_ids=link_ids, group_ids=group_ids, test_ids=test_ids)
+		except:
+			logger.info(f"Exception while adding Custom Attribute Values")
+			raise
+
+		return
 
 	# Notification Template API calls
 	def get_notification_templates(self):
