@@ -26,7 +26,7 @@
 #!/usr/bin/env python
 from steelscript.common.app import Application
 from steelscript.common.service import Service, UserAuth
-from steelscript.netim.core.device import Device
+from steelscript.netim.core.device import NetIM
 import pprint
 
 class SteelScriptApp(Application):
@@ -43,7 +43,7 @@ class SteelScriptApp(Application):
         password=(self.options.password)
         auth = UserAuth(username=username, password=password)
 
-        netim_device = Device(host, auth)
+        netim_device = NetIM(host, auth)
 
         device_list = netim_device.get_all_devices()
         

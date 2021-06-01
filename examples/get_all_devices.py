@@ -15,7 +15,7 @@
 '''
 
 from steelscript.common import UserAuth
-from steelscript.netim.core.device import Device
+from steelscript.netim.core.netim import NetIM
 import pprint
 
 # Fill these in with appropriate values
@@ -24,7 +24,7 @@ username = '$username'
 password = '$password'
 
 auth=UserAuth(username, password)
-netim_device = Device(host, auth)
+netim_device = NetIM(host, auth)
 
 device_list = netim_device.get_all_devices()
 pprint.pprint(device_list)
