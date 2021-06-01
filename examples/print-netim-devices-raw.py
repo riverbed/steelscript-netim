@@ -26,7 +26,7 @@
 #!/usr/bin/env python
 from steelscript.common.app import Application
 from steelscript.common.service import Service, UserAuth
-from steelscript.netim.core.device import NetIM
+from steelscript.netim.core.netim import NetIM
 import pprint
 
 class SteelScriptApp(Application):
