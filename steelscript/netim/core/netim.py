@@ -14,14 +14,14 @@ from steelscript.common.service import Service
 from steelscript.common.exceptions import RvbdHTTPException
 
 __all__ = ['DefinitionJSONEncoder', 'Definition', \
-	'CustomAttributeDefinitionCreate', 'NewCustomAttributeValue', 'ModifyCustomAttributeValue', \
+	'CustomAttributeDefinitionCreate', 'NewCustomAttributeValue', \
 	'ModifiableDefaultThreshold', 'ModifiableInterface', \
 	'ModifiableAlertProfileBean', 'ModifiablePollingProfileBean', \
 	'ModifiableNotificationTemplate', \
 	'CreatableGroup', 'ModifiableGroup', 'Group', \
 	'ModifiableInterface', \
 	'ModifiableLink', 'ModifiableLinkList', \
-	'ModifiableDevice', ModifiableDeviceAccessInfoBean', 'ModifiableDeviceList', \
+	'ModifiableDevice', 'ModifiableDeviceAccessInfoBean', 'ModifiableDeviceList', \
 	'Metric', 'NetIM'] 
 
 logging.captureWarnings(True)
@@ -386,12 +386,68 @@ class Metric(Definition):
 		self.valueEnumMap = value_enum_map
 		self.componentPart = component_part
 
+class NetworkMetricDataParams(Definition):
+	# durationTimeUnits is one of NANOSECONDS, MICROSECONDS, MILLISECONDS, SECONDS, MINUTES, HOURS, DAYS
+	# metricEpochEnum is one of WEEKLY, DAILY, HOURLY, RAW
+	# sortOrder is one of ASCENDING, DESCENDING, UNSORTED
+	# timeFilterEnum is one of BUSINESS_HOURS, NON_BUSINESS_HOURS
+
+	def __init__(self, aggregate_filter, aggregations, compute_data_sketch_aggregations,
+		duration, duration_time_units, element_ids, element_type, end_time,
+		include_element_ref_info_details, include_element_ref_info_string_only,
+		include_samples, limit, metric_class, metric_epoch_enum,
+		metrics, page_id, page_size, rollup_criterias, sample_filter, sort_order,
+		start_time, time_filter_enum):
+
+		if aggregate_filter != None:	
+			self.aggregateFilter = aggregate_filter
+		if aggregations != None:
+			self.aggregations = aggregations
+		else:
+			self.aggregations = []
+		#self.computeDataSketchAggregations = compute_data_sketch_aggregations
+		if duration != None:
+			self.duration = duration
+		if duration_time_units != None:
+			self.durationTimeUnits = duration_time_units
+		self.elementIds = element_ids
+		self.elementType = element_type
+		self.endTime = end_time
+		#self.includeElementRefInfoDetails = include_element_ref_info_details
+		#self.includeElementRefInfoStringOnly = include_element_ref_info_string_only
+		self.includeSamples = include_samples
+		if limit != None:
+			self.limit = limit
+		self.metricClass = metric_class
+		#self.metricEpochEnum = metric_epoch_enum
+		self.metrics = metrics
+		if page_id != None:
+			self.pageId = page_id
+		self.pageSize = page_size
+		self.rollupCriterias = rollup_criterias
+		if sample_filter != None:
+			self.sampleFilter = sample_filter
+		self.sortOrder = sort_order
+		self.startTime = start_time
+		#self.timeFilterEnum = time_filter_enum
+
+class NetworkMetricDataImport(Definition):
+
+	def __init__(self, metric_class, sample_list, identifiers=None, max_timestamp=0, min_timestamp=0, source=None):
+
+		self.identifiers = identifiers
+		self.metricClass = metric_class
+		self.minTimestamp = min_timestamp
+		self.maxTimestamp = max_timestamp
+		self.sampleList = sample_list
+		self.source = source
+
 #-----
 
 class NetIM(Service):
 	"""NetIM Core Device API
 
-	Responsible for DELETE, GET, POST, PUT methods against NetIM Device.
+	Responsible for DELETE, GET, POST, PUT, PATCH methods against NetIM Device.
 
 	"""
 	# General Class functions
@@ -430,7 +486,12 @@ class NetIM(Service):
 			self.version = version
 		
 		self.base_url = f'/api/netim/{self.version}/'
+		self.metric_export_url = f'/swarm/NETIM_NETWORK_METRIC_DATA_SERVICE/api/{self.version}/'
+		self.metric_import_url = f'/swarm/NETIM_NETWORK_METRIC_IMPORT_SERVICE/api/{self.version}/'
 		self.map_cache = {}
+		self.allcountry_cache = None
+		self.region_cache = {}
+		self.city_cache = {}
 		logger.info("Initialized NetIM Core Device API object with %s" % self.host)
 
 		atexit.register(self.cleanup)
@@ -440,6 +501,26 @@ class NetIM(Service):
 		return
 
 	# Generic API calls for resource URLs; prefer the direct calls, but allows for quick pickup of new API calls
+	def _get_text(self, url):
+		response = None
+		try:
+			response = self.service.conn.request('GET', url)
+		except:
+			logger.info(f"Exception while getting data from {url}:")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+			raise
+			
+		if response is not None:
+			if response.status_code >=200 and response.status_code < 300:
+				resp_text = response.text
+				return resp_text
+			else:
+				logger.info(f"Error while getting text. Status code: {response.status_code}")
+				logger.debug(f"{response}")
+				raise Exception(f"Error while getting text from {url}")
+		else:	
+			return None
+
 	def _get_json(self, url):
 		json_dict = None
 		try:
@@ -449,7 +530,7 @@ class NetIM(Service):
 				raise
 		except AttributeError as e:
 			logger.info(f"Exception while getting data from {url}:")
-			logger.debug(f"Attribute error: {e}")
+			logger.debug(f"AttributeError: {e}")
 			raise
 		except:
 			logger.info(f"Exception while getting data from {url}:")
@@ -476,11 +557,11 @@ class NetIM(Service):
 			raise Exception(f"No response from {resource_url}")
 
 		# If JSON dict is first of a series of paged data, loop through getting additional pages
-		if 'meta' in json_dict:
+		if 'meta' in json_dict and 'total' in json_dict['meta']:
 			total = json_dict['meta']['total']
 			next_offset = json_dict['meta']['next_offset']
 			limit = json_dict['meta']['limit']
-			while next_offset < total:
+			while next_offset != None and next_offset < total:
 				json_dict_next_page = self._get_json_from_resource_page(resource_url, \
 					limit, next_offset) 
 				total_items = json_dict['items']
@@ -495,6 +576,195 @@ class NetIM(Service):
 					json_dict['meta'] = json_dict_next_page['meta']
 
 		return json_dict
+
+	def _patch_json(self, url, data=None):
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+		response = None
+
+		try:
+			if data == None:
+				response = self.service.conn.request('PATCH', url, extra_headers=extra_headers)
+			else:
+				response = self.service.conn.request('PATCH', url, body=data, 
+					extra_headers=extra_headers)
+
+			if response == None:
+				logger.info(f"Exception while patching data to {url}")
+				raise
+
+		except AttributeError as e:
+			logger.debug(f"AttributeError: {e}")
+			raise
+		except KeyError as e:
+			logger.debug(f"KeyError: {e}")
+			raise
+		except NameError as e:
+			logger.debug(f"NameError: {e}")
+			raise
+		except TypeError as e:
+			logger.debug(f"TypeError: {e}")
+			raise
+		except:
+			if response is not None:
+				logger.info(f"Error while patching. Status code: {response.status_code}")
+				logger.debug(f"{response}")
+			else:
+				logger.info(f"Error while patching to {url}")
+			raise 
+
+		if response is not None:
+			if response.status_code == 207:
+				logger.info(f"Response from {url} returned in multi-response format.")
+				response_json = response.json()
+				if 'responses' in response_json:
+					responses = response_json['responses']
+					for response in responses:
+						status=''
+						if 'status' in response:
+							status = response['status']
+						status_info=''
+						if 'statusInfo' in response:
+							status_info = response['statusInfo']
+						logger.info(f"Device status: {status}:{status_info}")
+			elif response.status_code >=200 and response.status_code < 300:
+				resp_text = response.text
+				return resp_text
+			else:
+				logger.info(f"Error while patching. Status code: {response.status_code}")
+				logger.debug(f"{response}")
+				raise Exception(f"Error while patching to {url}")
+		else:
+			logger.info(f"Error while patching to {url}")
+			return None
+	
+	def _post_json(self, url, data=None):
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+		response = None
+
+		try:
+			if data == None:
+				response = self.service.conn.request('POST', url, extra_headers=extra_headers)
+			else:
+				response = self.service.conn.request('POST', url, body=data, 
+					extra_headers=extra_headers)
+
+			if response == None:
+				logger.info(f"No response when posting data to {url}")
+				raise Exception(f"No response when posting data to {url}")
+
+		except AttributeError as e:
+			logger.debug(f"AttributeError: {e}")
+			raise
+		except KeyError as e:
+			logger.debug(f"KeyError: {e}")
+			raise
+		except NameError as e:
+			logger.debug(f"NameError: {e}")
+			raise
+		except TypeError as e:
+			logger.debug(f"TypeError: {e}")
+			raise
+		except:
+			if response is not None:
+				logger.info(f"Error while posting. Status code: {response.status_code}")
+				logger.debug(f"{response}")
+			else:
+				logger.info(f"Error while posting to {url}")
+			raise 
+
+		if response is not None:
+			if response.status_code == 207:
+				logger.info(f"Response from {url} returned in multi-response format.")
+				response_json = response.json()
+				if 'responses' in response_json:
+					responses = response_json['responses']
+					for response in responses:
+						status=''
+						if 'status' in response:
+							status = response['status']
+						status_info=''
+						if 'statusInfo' in response:
+							status_info = response['statusInfo']
+						logger.info(f"Device status: {status}:{status_info}")
+			elif response.status_code >=200 and response.status_code < 300:
+				resp_text = response.text
+				return resp_text
+			else:
+				logger.info(f"Error while posting. Status code: {response.status_code}")
+				logger.debug(f"{response}")
+				raise Exception(f"Error while posting to {url}")
+		else:
+			logger.info(f"Error while posting to {url}")
+			return None
+	
+	def _put_json(self, url, data=None):
+		extra_headers = {}
+		extra_headers['Content-Type'] = 'application/json'
+		extra_headers['Accept'] = 'application/json'
+		response = None
+
+		try:
+			if data == None:
+				response = self.service.conn.request('PUT', url, extra_headers=extra_headers)
+			else:
+				response = self.service.conn.request('PUT', url, body=data, 
+					extra_headers=extra_headers)
+
+			if response == None:
+				logger.info(f"Exception while putting data to {url}")
+				raise Exception(f"No response when putting data to {url}")
+
+		except:
+			logger.info(f"Error while putting. Status code: {response.status_code}")
+			logger.debug(f"{response}")
+			raise
+
+		if response is not None:
+			if response.status_code >=200 and response.status_code < 300:
+				resp_text = response.text
+				return resp_text
+			else:
+				logger.info(f"Error while putting. Status code: {response.status_code}")
+				logger.debug(f"{response}")
+				raise Exception(f"Error while putting to {url}")
+		else:
+			logger.info(f"Error while putting to {url}")
+			return None
+	
+	def _delete(self, url, data=None):
+		response = None
+		try:
+			if data == None:
+				response = self.service.conn.request('DELETE', url)
+			else:
+				response = self.service.conn.request('DELETE', url, body=data)
+
+			if response == None:
+				logger.info(f"No response when deleting data from {url}")
+				raise Exception(f"No response when deleting data from {url}")
+		except AttributeError as e:
+			logger.info(f"Exception while deleting data from {url}")
+			logger.debug(f"AttributeError: {e}")
+			raise
+		except:
+			logger.info(f"Exception while deleting data from {url}")
+			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+			raise
+
+		if response is not None:
+			if response.status_code >=200 and response.status_code < 300:
+				resp_text = response.text
+				return resp_text
+			else:
+				logger.info(f"Error while deleting. Status code: {response.status_code}")
+				logger.debug(f"{response}")
+				raise Exception(f"Error while deleting from {url}")
+		else:
+			return None
 
 	def _get_id_from_name(self, object_type, id_property, name_property, object_name):
 		url = f'{self.base_url}{object_type}'
@@ -570,22 +840,9 @@ class NetIM(Service):
 	def get_archive_file_by_id(self, archive_id):
 
 		url = f'{self.base_url}archives/{archive_id}/file'
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'text/plain'
-		extra_headers['Accept'] = 'text/plain'
-
-		response_text = None
-		try:
-			response = self.service.conn.request('GET', url, extra_headers)
-		except:
-			logger.info(f"Exception while getting configuration file from {url}")
-		if response is not None:
-			if response.status_code == 200:
-				response_text = response.text
-		else:
-			raise Exception(f"No response from {url}")
+		response = self._get_text(url)
 				
-		return response_text
+		return response
 
 	# Default Threshold API calls
 	def get_default_thresholds(self):
@@ -599,25 +856,9 @@ class NetIM(Service):
 		return response
 
 	def update_default_threshold(self, threshold_id, modified_threshold):
-
 		url = f'{self.base_url}default-thresholds/{threshold_id}'
-		body = dumps(modified_threshold, cls=DefinitionJSONEncoder)
-
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		response = None
-		try:
-			response = self.service.conn.request('PUT', url, body=body, extra_headers=extra_headers)
-		except TypeError as e:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug(f"TypeError: {e}")
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
-		return
+		response = self._put_json(url, data=dumps(modified_threshold, cls=DefinitionJSONEncoder))
+		return response
 
 	# Device API calls	
 	def get_device_id_by_device_name(self, device_name):
@@ -674,7 +915,7 @@ class NetIM(Service):
 	def get_devices_with_custom_attributes(self, custom_attr_name_list):
 
 		url = f'{self.base_url}custom-attribute-values'
-		json_dict = self.get_json_from_resource(url)
+		json_dict = self._get_json_from_resource(url)
 
 		device_ids_set = set()
 		items = json_dict['items']
@@ -685,53 +926,20 @@ class NetIM(Service):
 
 		return list(device_ids_set)
 
+	def get_device_by_id(self, device_id):
+		url = f'{self.base_url}devices/{device_id}'
+		response = self._get_json_from_resource(url)
+		return response
+
 	def _get_sysname_access_id_map(self, use_cache=False):
 		return self._get_object_id_map('devices', 'id', 'sysName', 'deviceName', use_cache)
 
 	def _get_device_access_id_map(self, use_cache=False):
 		return self._get_object_id_map('devices', 'deviceAccessInfoId', 'sysName', 'deviceName', use_cache)	
-
 	def _add_devices_from_definition(self, devices):
 
 		url = f'{self.base_url}devices'
-		response = None
-		try:
-			extra_headers = {}
-			extra_headers['Content-Type'] = 'application/json'
-			extra_headers['Accept'] = 'application/json'
-			body = dumps(devices, cls=DefinitionJSONEncoder)
-			response = self.service.conn.request('POST', url, body=body, extra_headers=extra_headers)
-		except (NameError,AttributeError,TypeError) as e:
-			logger.info(f"Exception while posting to URL: {url}")
-			logger.debug(f"Attribute error: {e}")
-		except:
-			logger.info(f"Exception while posting data to {url}")
-
-		if response is not None:
-			if response.status_code == 207:
-				logger.info(f"Response from {url} returned in multi-response format.")
-				response_json = response.json()
-				responses = response_json['responses']
-				if 'responses' in response_json:
-					for response in responses:
-						status=''
-						if 'status' in response:
-							status = response['status']
-						status_info=''
-						if 'statusInfo' in response:
-							status_info = response['statusInfo']
-						logger.info(f"Device status: {status}:{status_info}")
-			elif response.status_code >=200 and response.status_code < 300:
-				resp_text = response.text
-				logger.info(f"Response: {resp_text}")
-			else:
-				logger.info(f"Error while adding devices. Status code: {response.status_code}")
-				logger.debug(f"Check that device names and access addresses do not match existing devices.")
-				raise Exception('Error while adding devices')
-		else:
-			logger.debug(f"Unable to retrieve resource {url}.")
-			raise Exception(f'Unable to retrieve data from {url}')
-
+		response = self._post_json(url, data=dumps(devices, cls=DefinitionJSONEncoder))
 		return response
 
 	def add_device_without_detail(self, device_name, access_address):
@@ -763,16 +971,7 @@ class NetIM(Service):
 	def delete_device_by_id(self, device_id, exclude=False):
 		url = f'{self.base_url}devices/{device_id}'
 		parameters = f'id={device_id}&excludeFromDiscovery={exclude}'
-		response = None
-		try:
-			response = self.service.conn.request('DELETE', url + '?' + parameters)
-		except TypeError as e:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug(f"TypeError: {e}")
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
+		response = self._delete(url + '?' + parameters)
 		return response
 
 	def delete_devices_by_id(self, device_id_list):
@@ -780,18 +979,31 @@ class NetIM(Service):
 		data = {'objectIds': device_id_list}
 
 		parameters = 'excludeFromDiscovery=false&confirmDeleteAll=true'
-		response = None
-		try:
-			response = self.service.conn.request('DELETE', url + '?' + parameters, 
-				data=dumps(data))
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-		
+		response = self._delete(url + '?' + parameters, data=dumps(data))
 		return response
 
-	### def update_device_timezone(self, ...):
+	def _update_devices(self, devices_json):
+		url = f'{self.base_url}devices'
+		response = self._patch_json(url, data=dumps(devices_json, cls=DefinitionJSONEncoder))
+		return response
+
+	def update_device_timezone(self, device_id, timezone):
+		device_json = self.get_device_by_id(device_id)
+
+		# Clean up retrieved device JSON into modifiable device JSON
+		modifiable_device = ModifiableDevice(name=device_json['name'],
+			display_name=device_json['displayName'], device_name=device_json['deviceName'],
+			access_address=device_json['accessAddress'], 
+			time_zone=timezone, links=device_json['links'])
+
+		# Add to a list of modified devices
+		modified_devices_json = {}
+		modified_devices_json['items'] = [modifiable_device]
+		
+		response = self._update_devices(modified_devices_json)
+
+		return response
+		
 	### timeZone, timeZoneDisplayName
 	### def update_device_location(self, ...):
 	### city, cityDisplayName, regionID, regionIDDisplayName, countryCode, countryCodeDisplayName 
@@ -817,44 +1029,13 @@ class NetIM(Service):
 
 	def delete_interface(self, interface_id):
 		url = f'{self.base_url}interfaces/{interface_id}'
-		response = None
-		try:
-			response = self.service.conn.request('DELETE', url, extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to add devices to group using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to add devices to group using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-
-		return
+		response = self._delete(url)
+		return response
 
 	def update_interface(self, interface_id, modified_interface):
 		url = f'{self.base_url}interfaces/{interface_id}'
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		response = None
-		try:
-			response = self.service.conn.request('PATCH', url, body=dumps(modified_interface, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to add devices to group using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to add devices to group using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-
-		return
+		response = self._patch_json(url, data=dumps(modified_interface, cls=DefinitionJSONEncoder))
+		return response
 
 	def get_hosts_on_interface(self, interface_id, detected_ips_only=False, including_polling_info=True):
 		url = f'{self.base_url}interfaces/{interface_id}/hosts'
@@ -962,34 +1143,16 @@ class NetIM(Service):
 		return custom_attribute_values_json
 
 	def add_group(self, group_name, group_description="", group_type='Subnet'):
-
-		if group_type not in ['User', 'Subnet']:
-			logger.debug(f'Group type {group_type} not provided as expected.')
+		group_types = ['User', 'Subnet']
+		if group_type not in group_types:
+			logger.debug(f'Group type {group_type} not in {group_types} as expected.')
 			logger.debug(f'Please provide group type of User or Subnet')
-			return
+			return None
 
 		url = f'{self.base_url}groups'
 		group = CreatableGroup(name=group_name, description=group_description, type=group_type)
-
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		try:
-			response = self.service.conn.request('POST', url, body=dumps(group, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to add devices to group using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to add devices to group using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-
-		return
+		response = self._post_json(url, data=dumps(group, cls=DefinitionJSONEncoder))
+		return response
 
 	def add_devices_to_group(self, group_name, device_ids=[]):
 
@@ -1008,21 +1171,8 @@ class NetIM(Service):
 		extra_headers['Accept'] = 'application/json'
 
 		group_update = ModifiableGroup(group_name, add_devices=device_ids)
-		try:
-			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to add devices to group using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to add devices to group using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while adding devices to {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-
-		return
+		response = self._patch_json(url, data=dumps(group_update, cls=DefinitionJSONEncoder))
+		return response
 
 	def remove_devices_from_group(self, group_name, device_ids=[]):
 
@@ -1038,20 +1188,8 @@ class NetIM(Service):
 		extra_headers['Accept'] = 'application/json'
 
 		group_update = ModifiableGroup(group_name, remove_devices=device_ids)
-		try:
-			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to add devices to group using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to add devices to group using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while adding devices to {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-		
-		return
+		response = self._patch_json(url, data=dumps(group_update, cls=DefinitionJSONEncoder))
+		return response
 
 	def add_group_to_hierarchy(self, group_name, parent_group_name):
 
@@ -1061,29 +1199,14 @@ class NetIM(Service):
 			return
 		parent_group_id = int(self.get_group_id_by_group_name(parent_group_name))
 		if parent_group_id < 0:
-			logger.info(f"Gropu name '{parent_group_name}' not found in NetIM")
+			logger.info(f"Group name '{parent_group_name}' not found in NetIM")
 			return
 
 		url = f'{self.base_url}groups/{parent_group_id}'
 
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
 		group_update = ModifiableGroup(parent_group_name, add_groups=[group_id])
-		try:
-			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to add group to parent group using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to add group to parent group using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while adding devices to {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-		
+		response = self._patch_json(url, data=dumps(group_update, cls=DefinitionJSONEncoder))
+		return response
 
 	def remove_group_from_hierarchy(self, group_name, parent_group_name):
 
@@ -1098,62 +1221,25 @@ class NetIM(Service):
 
 		url = f'{self.base_url}groups/{parent_group_id}'
 
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
 		group_update = ModifiableGroup(parent_group_name, remove_groups=[group_id])
-		try:
-			response = self.service.conn.request('PATCH', url, body=dumps(group_update, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to remove group from parent group using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to remove group from parent group using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while adding devices to {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-		
-		return
+		response = self._patch_json(url, data=dumps(group_update, cls=DefinitionJSONEncoder))
+		return response
 
 	def delete_all_groups(self, group_type):
 		
-		if group_type not in ['ALL', 'SITE', 'GROUP']:
-			return
+		group_types = ['ALL', 'SITE', 'GROUP']
+		if group_type not in group_types:
+			raise Exception(f"Group type is not one of {group_types}")
 
 		url = f'{self.base_url}groups'
-		
 		final_url = url + '?type=' + group_type + '&confirmDeleteAll=false'
-
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		try:
-			response = self.service.conn.request('DELETE', final_url, extra_headers=extra_headers)
-		except:
-			logger.info(f"Exception while deleting groups using {final_url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-		
-		return 
+		response = self._delete(final_url)
+		return response
 
 	def delete_group_by_id(self, group_id):
 		url = f'{self.base_url}groups/{group_id}'
-
-		response = None
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		try:
-			response = self.service.conn.request('DELETE', url, extra_headers=extra_headers)
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-		
-		return 
+		response = self._delete(url)
+		return response
 
 	def delete_group(self, group_name):
 		group_id = int(self.get_group_id_by_group_name(group_name))
@@ -1164,9 +1250,22 @@ class NetIM(Service):
 		return
 		
 	# Location API calls
-	def get_all_countries(self):
-		url = f'{self.base_url}countries'
-		countries_json = self._get_json_from_resource(url)
+	def get_all_countries(self, use_cache=False):
+
+		countries_json = None
+		if use_cache == True:
+			countries_json = self.allcountry_cache
+
+		if countries_json == None:
+			url = f'{self.base_url}countries'
+			try:
+				countries_json = self._get_json_from_resource(url)
+			except:
+				return None
+
+		if use_cache == True:
+			self.allcountry_cache = countries_json
+		
 		return countries_json
 	
 	def get_country_by_id(self, country_id):
@@ -1174,9 +1273,22 @@ class NetIM(Service):
 		country_json = self._get_json_from_resource(url)
 		return country_json
 	
-	def get_regions_by_country_id(self, country_id):
-		url = f'{self.base_url}countries/{country_id}/regions'
-		regions_json = self._get_json_from_resource(url)
+	def get_regions_by_country_id(self, country_id, use_cache=False):
+		regions_json = None
+		if use_cache == True:
+			if country_id in self.region_cache:
+				regions_json = self.region_cache[country_id]
+		
+		if regions_json == None:
+			url = f'{self.base_url}countries/{country_id}/regions'
+			try:
+				regions_json = self._get_json_from_resource(url)
+			except:
+				return None
+
+		if use_cache == True:
+			self.region_cache[country_id] = regions_json
+			
 		return regions_json
 	
 	def get_region_by_id(self, region_id):
@@ -1184,15 +1296,81 @@ class NetIM(Service):
 		region_json = self._get_json_from_resource(url)
 		return region_json
 	
-	def get_cities_by_region_id(self,region_id):
-		url = f'{self.base_url}regions/{region_id}/cities'
-		cities_json = self._get_json_from_resource(url)
+	def get_cities_by_region_id(self, region_id, use_cache=False):
+		cities_json = None
+		if use_cache == True:
+			if region_id in self.city_cache:
+				cities_json = self.city_cache[region_id]
+
+		if cities_json == None:
+			url = f'{self.base_url}regions/{region_id}/cities'
+			try:
+				cities_json = self._get_json_from_resource(url)
+			except:
+				return None
+
+		if use_cache == True:
+			self.city_cache[region_id] = cities_json
+
 		return cities_json
 
 	def get_city(self,city_id):
 		url=f'{self.base_url}cities/{city_id}'
 		cities_json = self._get_json_from_resource(url)
 		return cities_json
+
+	def check_location_exists(self, location_country, location_region=None, location_city=None, use_cache=True):
+
+		country_found = region_found = city_found = False
+
+		# Get list of countries
+		countries_json = self.get_all_countries(use_cache)
+		if countries_json != None and 'items' in countries_json:	
+			countries = countries_json['items']
+		else:
+			countries = []
+
+		# Iterate over countries and find country name
+		for country in countries:
+			country_name = country['name']
+			if country_name == location_country:
+				country_found = True
+				
+				if location_region == None:
+					break
+
+				regions_json = self.get_regions_by_country_id(country['id'])
+				if regions_json != None and 'items' in regions_json:
+					regions = regions_json['items']
+
+					for region in regions:
+						region_name = region['name']
+						if region_name == location_region:
+							region_found = True
+							
+							if location_city == None:
+								break
+
+							cities_json = self.get_cities_by_region_id(region['id'])
+							if cities_json != None and 'items' in cities_json:
+								cities = cities_json['items']
+						
+								for city in cities:
+									city_name = city['name']
+									if city_name == location_city:
+										city_found = True
+										break
+						if region_found == True:
+							break
+			if country_found == True:
+				break
+
+		if (country_found == True and location_region == None and location_city == None) or \
+			(country_found == True and region_found == True and location_city == None) or \
+			(country_found == True and region_found == True and city_found == True):
+			return True
+		else:
+			return False
 
 	# Host API calls
 	def get_all_hosts(self, detected_ips_only=False):
@@ -1221,49 +1399,14 @@ class NetIM(Service):
 
 	def add_links(self, links):
 		url = f'{self.base_url}links'
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		response = None
-		try:
-			response = self.service.conn.request('POST', url, body=dumps(link, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to add links using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to add links using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while adding data using {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-
+		response = self._post_json(url, data=dumps(link, cls=DefinitionJSONEncoder))
 		return response
 
 	def delete_all_links(self, links, confirm_delete_all=False):
 		url = f'{self.base_url}links'
 		url += f'?confirmDeleteAll={confirm_delete_all}'
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		response = None
-		try:
-			response = self.service.conn.request('DELETE', url, body=dumps(link, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to delete all links using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to delete all links using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-		return 
+		response = self._delete(url, data=dumps(link, cls=DefinitionJSONEncoder))
+		return response
 
 	def get_link_by_id(self, link_id):
 		url = f'{self.base_url}links/{link_id}'
@@ -1272,47 +1415,13 @@ class NetIM(Service):
 
 	def delete_link_by_id(self):
 		url = f'{self.base_url}links/{link_id}'
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		response = None
-		try:
-			response = self.service.conn.request('DELETE', url, body=dumps(link, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to delete link using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to delete link using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while deleting data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-		return
+		response = self._delete(url, data=dumps(link, cls=DefinitionJSONEncoder))
+		return response
 
 	def update_link_by_id(self, link_id, modifiable_link):
 		url = f'{self.base_url}links/{link_id}'
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-
-		response = None
-		try:
-			response = self.service.conn.request('PATCH', url, body=dumps(link, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-			if response is not None:
-				if response.status_code < 200 or response.status_code > 300:
-					logger.debug(f"Unable to update link using {url}. " + \
-						 "Status code: {response.status_code}")
-			else:
-				logger.debug(f"Unable to update link using {url}. No response from server.")
-		except:
-			logger.info(f"Exception while updating data from {url}")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-		return
+		response = self._patch_json(url, data=dumps(link, cls=DefinitionJSONEncoder))
+		return response
 
 	# Metric Classes API calls
 	def get_all_metric_classes(self):
@@ -1324,6 +1433,29 @@ class NetIM(Service):
 		url = f'{self.base_url}metric-classes/{metric_class_id}'
 		response = self._get_json_from_resource(url)
 		return response
+
+	def get_metric_class_id_by_name(self, metric_class_name):
+		metric_classes_json = self.get_all_metric_classes()
+		if 'items' in metric_classes_json:
+			metric_classes = metric_classes_json['items']
+		else:
+			return None
+
+		for metric_class in metric_classes:
+			if 'name' in metric_class:
+				if metric_class['name'] == metric_class_name:
+					if 'id' in metric_class:
+						return metric_class['id']
+					else:
+						break
+		return None
+
+	def get_metrics_from_metric_class(self, metric_class_id):
+		metric_class = self.get_metric_class_from_id(metric_class_id)
+		if 'metrics' in metric_class:
+			return metric_class['metrics']
+		else:
+			return None
 
 	# Monitored Path API calls
 	def get_all_monitoredpaths(self):
@@ -1442,20 +1574,9 @@ class NetIM(Service):
 
 			profile_url = f'{url}/{profile_id}'
 
-			try:
-				response = self.service.conn.request('PATCH', profile_url, 
-					data=dumps(profile_to_set, cls=DefinitionJSONEncoder))
-				if response is not None:
-					if response.status_code < 200 or response.status_code > 300:
-						logger.debug(f"Unable to patch profile {profile_url}. " + \
-							 "Status code: {response.status_code}")
-				else:
-					logger.debug(f"Unable to patch profile {profile_url}. No response from server.")
-			except:
-				logger.info("Exception in patch of {profile_url}.")
-				logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+			response = self._patch_json(profile_url, data=dumps(profile_to_set, cls=DefinitionJSONEncoder))
 
-		return
+		return response
 
 	# Custom Attribute API calls
 	def get_custom_attributes(self):
@@ -1483,19 +1604,7 @@ class NetIM(Service):
 		cust_attr = CustomAttributeDefinitionCreate(name, description, 
 			object_type_create_update_list=object_type_create_updates)
 
-		response = None
-		try:
-			extra_headers = {}
-			extra_headers['Content-Type'] = 'application/json'
-			extra_headers['Accept'] = 'application/json'
-			response = self.service.conn.request('POST', url, body=dumps(cust_attr, cls=DefinitionJSONEncoder),
-				extra_headers=extra_headers)
-		except (NameError,AttributeError,TypeError) as e:
-			logger.debug(f"Attribute error: {e}")
-		except:
-			logger.info(f"Exception while posting data to {url}:")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
+		response = self._post_json(url, data=dumps(cust_attr, cls=DefinitionJSONEncoder))
 		return response
 
 	def delete_custom_attribute(self, name):
@@ -1505,18 +1614,8 @@ class NetIM(Service):
 			logger.info(f"Custom attribute {name} not found")
 			raise Exception(f"Custom Attribute '{name}' not found in NetIM")
 		url = f'{self.base_url}custom-attributes/{attribute_id}'
-
-		response = None
-		try: 
-			extra_headers = {}
-			extra_headers['Content-Type'] = 'application/json'
-			extra_headers['Accept'] = 'application/json'
-			response = self.service.conn.request('DELETE', url, extra_headers=extra_headers)
-		except:
-			logger.info(f"Exception while deleting data from {url}:")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-	
-		return
+		response = self._delete(url)
+		return response
 
 	def get_custom_attribute_values(self):
 		url = f'{self.base_url}custom-attribute-values'
@@ -1549,18 +1648,10 @@ class NetIM(Service):
 
 		attribute_id = self.get_custom_attribute_id_by_name(cust_attr_name)
 		new_cust_attr_value = NewCustomAttributeValue(device_ids=device_ids, link_ids=link_ids,
-			group_ids=group_ids, interface_ids=interface_ids, test_ids=test_ids, attribute_id=attribute_id, value=value)
+			group_ids=group_ids, interface_ids=interface_ids, test_ids=test_ids, 
+			attribute_id=attribute_id, value=value)
 
-		try:
-			extra_headers = {}
-			extra_headers['Content-Type'] = 'application/json'
-			extra_headers['Accept'] = 'application/json'
-			response = self.service.conn.request('POST', url, body=dumps(new_cust_attr_value, 
-				cls=DefinitionJSONEncoder), extra_headers=extra_headers)
-		except:
-			logger.debug(f"Exception while getting data from {url}:")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
+		response = self._post_json(url, data=dumps(new_cust_attr_value, cls=DefinitionJSONEncoder))
 		return response
 
 	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value):
@@ -1570,35 +1661,11 @@ class NetIM(Service):
 		else:
 			raise Exception(f"Custom attribute '{cust_attr_name}' not found in NetIM.")
 
-		extra_headers = {}
-		extra_headers['Content-Type'] = 'application/json'
-		extra_headers['Accept'] = 'application/json'
-		body = {}
-		body['value'] = new_value
+		data = {}
+		data['value'] = new_value
 
-		try:
-			response = self.service.conn.request('PUT', url, body=dumps(body), extra_headers=extra_headers)
-			if response.status_code >=200 and response.status_code < 300:
-				resp_text = response.text
-				logger.info(f"Response: {resp_text}")
-			else:
-				logger.info(f"Error while updating custom attribute value. Status code: {response.status_code}")
-				raise Exception(f"Error in response to {url}: {response}")
-		except RvbdHTTPException as e:
-			logger.debug(f"RvbdHTTPException: {e}")
-			raise
-		except AttributeError as e:
-			logger.debug(f"AttributeError: {e}")
-			raise
-		except NameError as e:
-			logger.debug(f"NameError: {e}")
-			raise
-		except:
-			logger.info(f"Exception while putting data to {url}:")
-			logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-			raise
-
-		return
+		response = self._put_json(url, data=dumps(data))
+		return response
 
 	def reset_custom_attribute_name_and_value(self, name, description, value, 
 		device_ids=[], interface_ids=[], link_ids=[], group_ids=[], test_ids=[]):
@@ -1642,13 +1709,16 @@ class NetIM(Service):
 	# Notification Template API calls
 	def get_notification_templates(self, include_only_attrs=None, exclude_only_attrs=None):
 		url = f'{self.base_url}notification-templates'
-		url += f'?notificationTemplateIncludeOnlyAttrs={include_only_attrs}&notificationTemplateExcludeOnlyAttrs={exclude_only_attrs}'
+		url += f'?notificationTemplateIncludeOnlyAttrs={include_only_attrs}'
+		url += f'&notificationTemplateExcludeOnlyAttrs={exclude_only_attrs}'
 		notification_templates_json = self._get_json_from_resource(url)
 		return notification_templates_json
 	
-	def get_notifcation_template_from_id(self, notification_template_id, include_only_attrs=None, exclude_only_attrs=None):
+	def get_notification_template_from_id(self, notification_template_id, include_only_attrs=None, 
+		exclude_only_attrs=None):
 		url = f'{self.base_url}notification-templates/{notification_template_id}'
-		url += f'?notificationTemplateIncludeOnlyAttrs={include_only_attrs}&notificationTemplateExcludeOnlyAttrs={exclude_only_attrs}'
+		url += f'?notificationTemplateIncludeOnlyAttrs={include_only_attrs}'
+		url += f'&notificationTemplateExcludeOnlyAttrs={exclude_only_attrs}'
 		notification_template_json = self._get_json_from_resource(url)
 		return notification_template_json
 
@@ -1656,37 +1726,70 @@ class NetIM(Service):
 	### def delete_notification_template_from_id(self, notification_template_id):
 	### def add_notification_template(self, notification_template):	
 
+	def _get_metric_data(self, start_time, end_time, metric_class, metrics=[], 
+		element_ids=[], element_type='VNES_OE',
+		include_element_ref_info_details=False, include_element_ref_info_string_only=True, 
+		include_samples=True,
+		duration=None, duration_time_units=None, limit=None,
+		aggregate_filter=None, aggregations=None,
+		compute_data_sketch_aggregations=True,
+		metric_epoch_enum='RAW', page_id=None, page_size=1000, 
+		rollup_criterias=['aggregateAvgRollup'], sample_filter=None, sort_order='ASCENDING', 
+		time_filter_enum='BUSINESS_HOURS'):
 
-	#NETIM_METRIC_CLASS_TO_METRIC = {
-	#	"DEV_ALERT_EVENTS_DETAIL" : ["ProfileId", "AdditionalData", "AlertId", "AlertSeverity", "Data", "NumTimesSeen", "AlertState"],
-	#	"IFC_ALERT_EVENTS_DETAIL" : ["ProfileId", "AdditionalData", "AlertId", "AlertSeverity", "Data", "NumTimesSeen", "AlertState"],
-	#	"DEV_SYSLOG_EVENTS_DETAIL" : ["Agent","Severity","Data","AdditionalData"],
-	#	"DEV_TRAP_EVENTS_DETAIL" : ["Agent","TrapOID","Category","Severity","TrapDisplayName","Data","AdditionalData"],
-	#	"IFC_SYSLOG_EVENTS_DETAIL" : ["Agent","Severity","Data","AdditionalData"],
-	#	"IFC_TRAP_EVENTS_DETAIL" : ["Agent","TrapOID","Category","Severity","TrapDisplayName","Data","AdditionalData"]
-	#}
+		url = f'{self.metric_export_url}network-metric-data'
 
-	#def get_metric_data(self, metric_class_to_devices_map, obj_name_id_dict, device_interface_id_name_map,
-	#	alert_profile_id_map, metric_class_to_metric_map=NETIM_METRIC_CLASS_TO_METRIC):
-	#
-	#	return json_dict
+		network_metric_data_params = NetworkMetricDataParams(
+			aggregate_filter=aggregate_filter,
+			aggregations=aggregations,
+			compute_data_sketch_aggregations=compute_data_sketch_aggregations,
+			duration=duration,
+			duration_time_units=duration_time_units,
+			element_ids=element_ids,
+			element_type=element_type,
+			end_time=end_time, 
+			include_element_ref_info_details=include_element_ref_info_details,
+			include_element_ref_info_string_only=include_element_ref_info_string_only,
+			include_samples=include_samples,
+			limit=limit,
+			metric_class=metric_class, 
+			metric_epoch_enum=metric_epoch_enum,
+			metrics=metrics,
+			page_id=page_id,
+			page_size=page_size,
+			rollup_criterias=rollup_criterias,
+			sample_filter=sample_filter,
+			sort_order=sort_order,	
+			start_time=start_time,
+			time_filter_enum=time_filter_enum)
+	
+		data = dumps(network_metric_data_params, cls=DefinitionJSONEncoder)
+		response = self._post_json(url, data=data)
 
-	#def get_metric_data_for_device(self, ...)
+		return response
+
+	def __import_metric_data(self, identifiers, max_timestamp, metric_class, min_timestamp,
+		sample_list, source):
+		
+		url = f'{self.metric_import_url}network-metric-import'
+
+		network_metric_import_data = NetworkMetricImportData(
+			identifiers=identifiers,
+			min_timestamp=min_timestamp,
+			max_timestamp=max_timestamp,
+			metric_class=metric_class,
+			sample_list=sample_list,
+			source=source)
+
+		data = dumps(network_metric_import_data, cls=DefinitionJSONEncoder)
+		response = self._post_json(url, data=data)
+
+		return response
+
 	#def get_top_n_metrics(self, ...)
 
 	# Alert Data API calls
 	#def get_alert_data_for_device(self, use_cache=False):
-	#	url = f'{self.base_url}'
-	#
-	#	sysname_device_id_map = self._get_sysname_device_id_map(use_cache)
-	#	device_interface_id_name_map = {}
-	#	alert_profile_id_map = self._get_alert_profile_id_map(use_cache)
-
-	#	self.get_metric_data(metric_class_to_devices_map, metric_class_to_metric_map,
-	#		sysname_device_id_map, device_interface_id_name_map, alert_profile_id_map)
-
-	#	return
-
 	#def get_alert_data_for_anp(self, ...):
 	#def get_alert_data_for_group(self, ...):
 	#def get_alert_data_for_network(self, ...):
