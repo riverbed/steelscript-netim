@@ -948,7 +948,7 @@ class NetIM(Service):
 		if device_id > 0:
 			logger.info(f"Device name {device_name} already exists in NetIM.")
 			logger.info(f"Delete and re-add device or update relevant device information.")
-			raise Exception(f'Device name {device_name} does not exist in NetIM.')
+			raise Exception(f'Device name {device_name} already exists in NetIM.')
 
 		device_list=[{'device_name':device_name, 'access_address':access_address}]
 		devices = ModifiableDeviceList(device_list)
