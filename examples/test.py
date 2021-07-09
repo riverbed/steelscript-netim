@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Uncomment one of the following lines to review logging details interactively
 #logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 TEST_WAIT = 2
 TEST_AUTOMATION = True
@@ -246,8 +246,6 @@ def test_devices_and_groups_apis(netim, netim_devices):
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
 
 	# Test is failing
-	print(device['timeZone'])
-	print("")
 	#check(bool(device['timeZone'] == 'America/Chicago'), "Timezone not updated.")
 
 	# ADD GROUP AND CONFIRM
@@ -305,6 +303,29 @@ def test_devices_and_groups_apis(netim, netim_devices):
 			if int(group_device['id']) == int(device_id):
 				result = True
 	check(result, f"Device '{TEST_DEVICE_NAME}' should be visible in Group '{TEST_GROUP_NAME}'")	
+
+	# UPDATE DEVICE LOCATION
+	prompt(f"Update Device '{TEST_DEVICE_NAME}' city, state, country")
+	try:
+		country_id, region_id, city_id = netim.get_location_ids(TEST_COUNTRY_NAME, \
+			TEST_REGION_NAME, TEST_CITY_NAME)
+		response = netim.update_device_location(device_id, country_id, region_id, city_id)
+	except:
+		logger.info("Exception when updating device location")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	try:
+		device = netim.get_device_by_id(device_id)
+	except AttributeError as e:
+		logger.debug(f"AttributeError: {e}")
+	except:
+		logger.info("Exception when getting Device by ID")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	check(bool(device['city'] == city_id), "Location not updated.")
 
 	# REMOVE DEVICES FROM GROUP AND CONFIRM
 
@@ -505,9 +526,9 @@ def main():
 	prompt("")
 
 	#test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
-	#test_devices_and_groups_apis(netim, netim_devices)
-	#test_locations_apis(netim)
-	test_metric_apis(netim)
+	test_devices_and_groups_apis(netim, netim_devices)
+	test_locations_apis(netim)
+	#test_metric_apis(netim)
 
 	return
 

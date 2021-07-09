@@ -245,33 +245,42 @@ class ModifiableDeviceAccessInfoBean(Definition):
 			self.extMgmtSrvDevId = extmgmt_srvdevid
 
 class ModifiableDevice(Definition):
-	def __init__(self, name, display_name, device_name, access_address, device_access_info, description='',
-		city=None, region_id=None, country_code=None, time_zone=None, time_zone_display_name=None, 
+	def __init__(self, name=None, display_name=None, id=None, device_name=None, 
+		access_address=None, device_access_info=None, description=None,
+		city=None, region_id=None, country_code=None, 
+		time_zone=None, time_zone_display_name=None, 
 		links=None):
 
-		self.name = name
-		self.displayName = display_name
-		self.deviceName = device_name
-		self.accessAddress = access_address
-		self.description = description
-		self.deviceAccessInfo = device_access_info
-
+		if id != None:
+			self.id = id
+		if name != None:
+			self.name = name
+		if display_name != None:
+			self.displayName = display_name
+		if device_name != None:
+			self.deviceName = device_name
+		if access_address != None:
+			self.accessAddress = access_address
+		if description != None:
+			self.description = description
+		if device_access_info != None:
+			self.deviceAccessInfo = device_access_info
 		if city != None:
 			self.city = city
 		if region_id != None:
-			self.region_id = region_id
+			self.regionID = region_id
 		if country_code != None:
-			self.country_code = country_code
+			self.countryCode = country_code
 		if time_zone != None:
-			self.time_zone = time_zone
+			self.timeZone = time_zone
 		if time_zone_display_name != None:
-			self.time_zone_display_name = time_zone_display_name
+			self.timeZoneDisplayName = time_zone_display_name
 		if links != None:
 			self.links = links
 
 class ModifiableDeviceList(Definition):
 	
-	def __init__(self, device_list):
+	def __init__(self, device_list=[]):
 
 		self.items = []
 
@@ -298,6 +307,9 @@ class ModifiableDeviceList(Definition):
 			self.items.append(device)
 
 		# self.meta = total, count, limit, offset, next_offset, prev_offset
+
+	def add_device(self,device):
+		self.items.append(device)
 
 class ModifiableInterface(Definition):
 	def __init__(self, if_speed_in, if_speed_out, polling_override):
@@ -987,29 +999,71 @@ class NetIM(Service):
 		response = self._patch_json(url, data=dumps(devices_json, cls=DefinitionJSONEncoder))
 		return response
 
+	### This function does not work
 	def update_device_timezone(self, device_id, timezone):
+		
 		device_json = self.get_device_by_id(device_id)
 
 		# Clean up retrieved device JSON into modifiable device JSON
-		modifiable_device = ModifiableDevice(name=device_json['name'],
-			display_name=device_json['displayName'], device_name=device_json['deviceName'],
-			access_address=device_json['accessAddress'], 
-			time_zone=timezone, links=device_json['links'])
+		modifiable_device = ModifiableDevice(id=str(device_id),
+			time_zone=timezone)
 
 		# Add to a list of modified devices
-		modified_devices_json = {}
-		modified_devices_json['items'] = [modifiable_device]
+		modified_devices = ModifiableDeviceList()
+		modified_devices.add_device(modifiable_device)
+
+		response = self._update_devices(modified_devices)
+
+		return response
+
+	def update_device_coordinates(self, device_id, longitude, latitude):
+		device_json = self.get_device_by_id(device_id)
+
+		modifiable_device = ModifiableDevice(id=str(device_id), longitude=longitude,
+			latitude=latitude)
+		modifiable_devices = ModifiableDeviceList()
+		modifiable_devices.add_device(modifiable_device)
+
+		response = self._update_devices(modifiable_devices)
 		
-		response = self._update_devices(modified_devices_json)
+		return response
+
+	def update_devices_coordinates(self, device_ids, longitude, latitude):
+		modifiable_devices = ModifiableDeviceList()
+		for device_id in device_ids:
+			modifiable_device = ModifiableDevice(id=str(device_id), longitude=longitude,
+				latitude=latitude)
+			modifiable_devices.append(modifiable_device)
+
+		response = self._update_devices(modifiable_devices)
+
+		return response
+
+	def update_device_location(self, device_id, country_code, region_id, city):
+		device_json = self.get_device_by_id(device_id)
+
+		modifiable_device = ModifiableDevice(id=str(device_id), country_code=country_code,
+			region_id=region_id, city=city)
+		modifiable_devices = ModifiableDeviceList()
+		modifiable_devices.add_device(modifiable_device)
+		
+		response = self._update_devices(modifiable_devices)
+
+		return response
+
+	def update_devices_location(self, device_ids, country_code, region_id, city):
+		modifiable_devices = ModifiableDeviceList()
+		for device_id in device_ids:
+			device_json = self.get_device_by_id(device_id)
+			
+			modifiable_device = ModifiableDevice(id=str(device_id), country_code=country_code,
+				region_id=region_id, city=city)
+			modifiable_devices.add_device(modifiable_device)
+		
+		response = self._update_devices(modifiable_devices)
 
 		return response
 		
-	### timeZone, timeZoneDisplayName
-	### def update_device_location(self, ...):
-	### city, cityDisplayName, regionID, regionIDDisplayName, countryCode, countryCodeDisplayName 
-	### def update_device_coordinate(self, ...):
-	### longitude, latitude
-
 	# Interface API calls
 	def get_all_device_interfaces(self, device_id):
 		url = f'{self.base_url}devices/{device_id}/interfaces'
@@ -1321,7 +1375,16 @@ class NetIM(Service):
 
 	def check_location_exists(self, location_country, location_region=None, location_city=None, use_cache=True):
 
-		country_found = region_found = city_found = False
+		country_id, region_id, city_id = self.get_location_ids(location_country, location_region, location_city)
+		if (country_id != None and location_region == None and location_city == None) or \
+			(country_id != None and region_id != None and location_city == None) or \
+			(country_id != None and region_id != None and city_id != None):
+			return True
+		else:
+			return False
+
+	def get_location_ids(self, location_country, location_region=None, location_city=None, use_cache=True):
+		country_id = region_id = city_id = None
 
 		# Get list of countries
 		countries_json = self.get_all_countries(use_cache)
@@ -1334,43 +1397,38 @@ class NetIM(Service):
 		for country in countries:
 			country_name = country['name']
 			if country_name == location_country:
-				country_found = True
+				country_id = country['id']
 				
 				if location_region == None:
 					break
 
-				regions_json = self.get_regions_by_country_id(country['id'])
+				regions_json = self.get_regions_by_country_id(country['id'], use_cache)
 				if regions_json != None and 'items' in regions_json:
 					regions = regions_json['items']
 
 					for region in regions:
 						region_name = region['name']
 						if region_name == location_region:
-							region_found = True
+							region_id = region['id']	
 							
 							if location_city == None:
 								break
 
-							cities_json = self.get_cities_by_region_id(region['id'])
+							cities_json = self.get_cities_by_region_id(region['id'], use_cache)
 							if cities_json != None and 'items' in cities_json:
 								cities = cities_json['items']
 						
 								for city in cities:
 									city_name = city['name']
 									if city_name == location_city:
-										city_found = True
+										city_id = city['id']
 										break
-						if region_found == True:
+						if region_id != None:
 							break
-			if country_found == True:
+			if country_id != None:
 				break
 
-		if (country_found == True and location_region == None and location_city == None) or \
-			(country_found == True and region_found == True and location_city == None) or \
-			(country_found == True and region_found == True and city_found == True):
-			return True
-		else:
-			return False
+		return country_id, region_id, city_id
 
 	# Host API calls
 	def get_all_hosts(self, detected_ips_only=False):
