@@ -929,14 +929,49 @@ class NetIM(Service):
 		url = f'{self.base_url}custom-attribute-values'
 		json_dict = self._get_json_from_resource(url)
 
+		if 'items' in json_dict:
+			items = json_dict['items']
+		else:
+			return None
+
 		device_ids_set = set()
-		items = json_dict['items']
 		for item in items:
 			cust_attr_name = item['attributeDefinition']['name']
 			if cust_attr_name in cust_attr_name_list:
 				device_ids_set.update(item['deviceIds'])
 
 		return list(device_ids_set)
+
+	def get_custom_attribute_values_for_device(self, device_id):
+		url = f'{self.base_url}devices/{device_id}/custom-attribute-values'
+		cust_attrs_json = self._get_json_from_resource(url)
+		return cust_attrs_json
+
+	def get_custom_attribute_values_for_device_by_attribute_name(self, device_id, cust_attr_name):
+		# Get all of the Custom Attribute 'values', which are really ID/name/value/etc. tuples for the device
+		cust_attr_values_json = self.get_custom_attribute_values_for_device(device_id)
+		if 'items' in cust_attr_values_json:
+			cust_attr_values = cust_attr_values_json['items']
+		else:
+			return None
+
+		cust_attr_name_value_tuples = []
+		for cust_attr_value in cust_attr_values:
+			cust_attr_name_in_name_value_pair = None
+			if 'name' in cust_attr_value:
+				cust_attr_name_in_name_value_pair = cust_attr_value['name']
+			if cust_attr_name_in_name_value_pair == cust_attr_name:
+				if 'value' in cust_attr_value:
+					value = cust_attr_value['value']
+				else:
+					continue
+				if 'id' in cust_attr_value:
+					id = cust_attr_value['id']
+				cust_attr_name_value_tuples.append({'name':cust_attr_name, 
+					'value':value, 'id':id})
+
+		return cust_attr_name_value_tuples
+		
 
 	def get_device_by_id(self, device_id):
 		url = f'{self.base_url}devices/{device_id}'
@@ -1063,7 +1098,8 @@ class NetIM(Service):
 		response = self._update_devices(modifiable_devices)
 
 		return response
-		
+	
+	
 	# Interface API calls
 	def get_all_device_interfaces(self, device_id):
 		url = f'{self.base_url}devices/{device_id}/interfaces'
@@ -1679,7 +1715,7 @@ class NetIM(Service):
 		url = f'{self.base_url}custom-attribute-values'
 		response = self._get_json_from_resource(url)
 		return response
-
+	
 	def get_custom_attribute_value_id_by_name_and_value(self, cust_attr_name, cust_attr_value):
 		cust_attr_values = self.get_custom_attribute_values()
 		if 'items' in cust_attr_values:
@@ -1712,17 +1748,21 @@ class NetIM(Service):
 		response = self._post_json(url, data=dumps(new_cust_attr_value, cls=DefinitionJSONEncoder))
 		return response
 
-	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value):
-		attribute_id = int(self.get_custom_attribute_value_id_by_name_and_value(cust_attr_name, old_value))
-		if attribute_id >= 0:
-			url = f'{self.base_url}custom-attribute-values/{attribute_id}'
-		else:
-			raise Exception(f"Custom attribute '{cust_attr_name}' not found in NetIM.")
-
+	def update_custom_attribute_value_from_id(self, attribute_value_id, new_value):
+		url = f'{self.base_url}custom-attribute-values/{attribue_value_id}'
 		data = {}
 		data['value'] = new_value
 
 		response = self._put_json(url, data=dumps(data))
+		return response
+
+	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value):
+		attribute_value_id = int(self.get_custom_attribute_value_id_by_name_and_value(cust_attr_name, old_value))
+		if attribute_value_id >= 0:
+			response = self.update_custom_attribute_value_by_id(self, attribute_value_id, new_value)
+		else:
+			raise Exception(f"Custom attribute '{cust_attr_name}' not found in NetIM.")
+
 		return response
 
 	def reset_custom_attribute_name_and_value(self, name, description, value, 

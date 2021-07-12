@@ -111,6 +111,8 @@ def test_custom_attributes_apis(netim, test_device_id, test_group_id):
 		raise
 	check(bool(int(cust_attr_value_id) >= 0))
 
+	values = netim.get_custom_attribute_values_for_device_by_attribute_name(test_device_id, TEST_CUSTOM_ATTRIBUTE)
+
 	prompt(f"Changing Custom Attribute Value in Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}'")
 	try:
 		response = netim.update_custom_attribute_value(TEST_CUSTOM_ATTRIBUTE, TEST_CUSTOM_ATTRIBUTE_VALUE,
@@ -525,10 +527,10 @@ def main():
 	prompt("Beginning test execution ...")
 	prompt("")
 
-	#test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
+	test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
 	test_devices_and_groups_apis(netim, netim_devices)
 	test_locations_apis(netim)
-	#test_metric_apis(netim)
+	test_metric_apis(netim)
 
 	return
 
