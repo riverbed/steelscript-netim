@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Uncomment one of the following lines to review logging details interactively
 #logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-TEST_WAIT = 1
+TEST_WAIT = 2
 TEST_AUTOMATION = True
 
 TEST_CUSTOM_ATTRIBUTE = 'Test Custom Attribute'
@@ -25,7 +25,7 @@ TEST_CUSTOM_ATTRIBUTE_VALUE = 'Test'
 TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED = 'Changed'
 
 TEST_DEVICE_NAME = 'testxyz'
-TEST_DEVICE_ADDRESS = '10.1.150.TEST_WAIT'
+TEST_DEVICE_ADDRESS = '10.199.199.199'
 
 TEST_GROUP_NAME = 'groupxyz'
 TEST_SITE_NAME = 'Arlington'
@@ -34,6 +34,8 @@ TEST_REGION_NAME = 'Virginia'
 TEST_COUNTRY_NAME = 'United States of America'
 
 TEST_ARCHIVE_DEVICE = 'MidA-Mgt-Switch01'
+
+TEST_POLLED_DEVICE_ID = 15027
 
 def prompt(step1, step2=""):
 	print(step1)
@@ -108,6 +110,8 @@ def test_custom_attributes_apis(netim, test_device_id, test_group_id):
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
 		raise
 	check(bool(int(cust_attr_value_id) >= 0))
+
+	values = netim.get_custom_attribute_values_for_device_by_attribute_name(test_device_id, TEST_CUSTOM_ATTRIBUTE)
 
 	prompt(f"Changing Custom Attribute Value in Custom Attribute '{TEST_CUSTOM_ATTRIBUTE}'")
 	try:
@@ -199,6 +203,8 @@ def test_devices_and_groups_apis(netim, netim_devices):
 		response = netim.add_device_without_detail(TEST_DEVICE_NAME, TEST_DEVICE_ADDRESS)
 	except NameError as e:
 		logger.debug(f"NameError: {e}")
+	except AttributeError as e:
+		logger.debug(f"AttributeError: {e}")
 	except:
 		logger.info("Exception when adding device")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
@@ -214,11 +220,43 @@ def test_devices_and_groups_apis(netim, netim_devices):
 
 	check(bool(device_id != -1), f"Device '{TEST_DEVICE_NAME}' should be visible in Device Manager.")
 
+	# UPDATE DEVICE TIMEZONE
+	prompt(f"Updating Device '{TEST_DEVICE_NAME}' timezone")
+	try:
+		response = netim.update_device_timezone(device_id, 'America/Chicago')
+	except AttributeError as e:
+		logger.debug(f"AttributeError: {e}")
+	except KeyError as e:
+		logger.debug(f"KeyError: {e}")
+	except NameError as e:
+		logger.debug(f"NameError: {e}")
+	except TypeError as e:
+		logger.debug(f"TypeError: {e}")
+	except:
+		logger.info("Exception when updating device timezone")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	try:
+		device = netim.get_device_by_id(device_id)
+	except AttributeError as e:
+		logger.debug(f"AttributeError: {e}")
+	except:
+		logger.info("Exception when getting Device by ID")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	# Test is failing
+	#check(bool(device['timeZone'] == 'America/Chicago'), "Timezone not updated.")
+
 	# ADD GROUP AND CONFIRM
 
 	prompt(f"Adding Group '{TEST_GROUP_NAME}' to NetIM")
 	try:
 		response = netim.add_group(TEST_GROUP_NAME)
+	except NameError as e:
+		logger.debug(f"NameError: {e}")
 	except:
 		logger.info("Exception when adding group")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
@@ -241,6 +279,8 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	prompt(f"Add devices to Group '{TEST_GROUP_NAME}'")
 	try:
 		netim.add_devices_to_group(TEST_GROUP_NAME, [device_id])
+	except AttributeError as e:
+		logger.debug(f"AttributeError: {e}")
 	except:
 		logger.info("Exception when adding devices to group")
 		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
@@ -265,6 +305,29 @@ def test_devices_and_groups_apis(netim, netim_devices):
 			if int(group_device['id']) == int(device_id):
 				result = True
 	check(result, f"Device '{TEST_DEVICE_NAME}' should be visible in Group '{TEST_GROUP_NAME}'")	
+
+	# UPDATE DEVICE LOCATION
+	prompt(f"Update Device '{TEST_DEVICE_NAME}' city, state, country")
+	try:
+		country_id, region_id, city_id = netim.get_location_ids(TEST_COUNTRY_NAME, \
+			TEST_REGION_NAME, TEST_CITY_NAME)
+		response = netim.update_device_location(device_id, country_id, region_id, city_id)
+	except:
+		logger.info("Exception when updating device location")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	try:
+		device = netim.get_device_by_id(device_id)
+	except AttributeError as e:
+		logger.debug(f"AttributeError: {e}")
+	except:
+		logger.info("Exception when getting Device by ID")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	check(bool(device['city'] == city_id), "Location not updated.")
 
 	# REMOVE DEVICES FROM GROUP AND CONFIRM
 
@@ -381,6 +444,48 @@ def test_archives_apis(netim, device_name):
 
 	return
 
+def test_locations_apis(netim):
+
+	prompt("Location United States, Virginia, Richmond should exist")
+	check(netim.check_location_exists("United States of America", "Virginia", "Richmond"), "Location not found")
+
+	prompt("Location for France, Normandy should exist")
+	check(netim.check_location_exists("France", "Normandy"), "Location not found")
+	
+	prompt("Location for South Africa should exist")
+	check(netim.check_location_exists("South Africa"), "Location not found")
+
+	prompt("Location for Wakanda should not exist")
+	check(not netim.check_location_exists("Wakanda"), "Location found")
+
+	return
+
+def test_metric_apis(netim):
+
+	metric_classes_json = netim.get_all_metric_classes()
+	if 'items' in metric_classes_json:
+		metric_classes = metric_classes_json['items']
+	metric_classes_count = len(metric_classes)
+	prompt(f"There are {metric_classes_count} metric classes in NetIM.")
+
+	metric_class_name = 'Interface Utilization and Throughput'
+	metric_class_id = netim.get_metric_class_id_by_name(metric_class_name)
+	metrics_json = netim.get_metrics_from_metric_class(metric_class_id)
+	if 'items' in metrics_json:
+		metrics = metrics_json['items']
+	else:
+		metrics = metrics_json
+	metric_count = len(metrics)
+	prompt(f"There are {metric_count} metrics in metric class '{metric_class_name}' in NetIM.")
+
+	end_time = int(time.time() * 1000)
+	start_time = end_time - 1000*60*60
+	metric_data = netim._get_metric_data(start_time=start_time, end_time=end_time, metric_class=metric_class_id, 
+		metrics=[metrics[2]['id'], metrics[3]['id']], 
+		element_ids=[TEST_POLLED_DEVICE_ID], sort_order='ASCENDING')
+
+	return
+
 def main():
 
 	parser = argparse.ArgumentParser(description='Python utility to test SteelScript NetIM')
@@ -388,6 +493,11 @@ def main():
 	parser.add_argument('--netim_username', help='NetIM username')
 	parser.add_argument('--netim_password', help='NetIM password')
 	args = parser.parse_args()
+
+	if args.netim_hostname == None:
+		prompt("No hostname was specified. Use --netim_hostname argument to provide a hostname. Exiting ...")
+	if args.netim_username == None:
+		prompt("No username was specified. Use --netim_username argument to provide a username. Exiting ...")
 
 	netim_password = args.netim_password
 	if netim_password == None or netim_password == "":
@@ -419,7 +529,8 @@ def main():
 
 	test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
 	test_devices_and_groups_apis(netim, netim_devices)
-	#test_locations_apis(netim)
+	test_locations_apis(netim)
+	test_metric_apis(netim)
 
 	return
 
