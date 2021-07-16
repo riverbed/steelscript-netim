@@ -978,6 +978,11 @@ class NetIM(Service):
 		response = self._get_json_from_resource(url)
 		return response
 
+	def get_device_access_info_by_device_id(self, device_id):
+		url = f'{self.base_url}/devices/{device_id}/device-access-info'
+		response = self._get_json_from_resource(url)
+		return response
+
 	def _get_sysname_access_id_map(self, use_cache=False):
 		return self._get_object_id_map('devices', 'id', 'sysName', 'deviceName', use_cache)
 
@@ -997,8 +1002,8 @@ class NetIM(Service):
 			logger.info(f"Delete and re-add device or update relevant device information.")
 			raise Exception(f'Device name {device_name} already exists in NetIM.')
 
-		device_list=[{'device_name':device_name, 'access_address':access_address}]
-		devices = ModifiableDeviceList(device_list)
+		device_entry_list = [{'device_name':device_name, 'access_address':access_address}]
+		devices = ModifiableDeviceList(device_entry_list)
 		response = self._add_devices_from_definition(devices)
 
 		return response
@@ -1035,13 +1040,13 @@ class NetIM(Service):
 		return response
 
 	### This function does not work
-	def update_device_timezone(self, device_id, timezone):
+	def update_device_timezone(self, device_id, timezone, timezone_display_name=None):
 		
 		device_json = self.get_device_by_id(device_id)
 
 		# Clean up retrieved device JSON into modifiable device JSON
 		modifiable_device = ModifiableDevice(id=str(device_id),
-			time_zone=timezone)
+			time_zone=timezone, time_zone_display_name=timezone_display_name)
 
 		# Add to a list of modified devices
 		modified_devices = ModifiableDeviceList()
@@ -1098,6 +1103,29 @@ class NetIM(Service):
 		response = self._update_devices(modifiable_devices)
 
 		return response
+
+	### Unsupported API call
+	def autoconfigure_devices(self, device_names=[]):
+		
+		valid_device_names = []
+		for device_name in device_names:
+			device_id = int(self.get_device_id_by_device_name(device_name))
+			if device_id != -1:
+				valid_device_names.append(device_name)
+			else:
+				logger.info(f'The device {device_name} was not found in NetIM and cannot be autoconfigured.')
+
+		if len(valid_device_names) > 0:
+			url = f'{self.base_url}rpc/autoconfig'
+			data = {}
+			data['deviceNamesOrAddresses'] = device_names
+			data_json = dumps(data)
+
+			response = self._post_json(url, data=data_json)
+		else:
+			logger.info(f'There were no valid device names provided to autoconfigure.')
+
+		return
 	
 	
 	# Interface API calls
@@ -1749,7 +1777,7 @@ class NetIM(Service):
 		return response
 
 	def update_custom_attribute_value_from_id(self, attribute_value_id, new_value):
-		url = f'{self.base_url}custom-attribute-values/{attribue_value_id}'
+		url = f'{self.base_url}custom-attribute-values/{attribute_value_id}'
 		data = {}
 		data['value'] = new_value
 
@@ -1759,7 +1787,7 @@ class NetIM(Service):
 	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value):
 		attribute_value_id = int(self.get_custom_attribute_value_id_by_name_and_value(cust_attr_name, old_value))
 		if attribute_value_id >= 0:
-			response = self.update_custom_attribute_value_by_id(self, attribute_value_id, new_value)
+			response = self.update_custom_attribute_value_from_id(attribute_value_id, new_value)
 		else:
 			raise Exception(f"Custom attribute '{cust_attr_name}' not found in NetIM.")
 

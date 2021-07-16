@@ -24,8 +24,8 @@ TEST_CUSTOM_ATTRIBUTE_DESCRIPTION = 'Test attribute created on device'
 TEST_CUSTOM_ATTRIBUTE_VALUE = 'Test'
 TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED = 'Changed'
 
-TEST_DEVICE_NAME = 'testxyz'
-TEST_DEVICE_ADDRESS = '10.199.199.199'
+TEST_DEVICE_NAME = 'test_appresponse'
+TEST_DEVICE_ADDRESS = '10.1.150.220'
 
 TEST_GROUP_NAME = 'groupxyz'
 TEST_SITE_NAME = 'Arlington'
@@ -220,38 +220,58 @@ def test_devices_and_groups_apis(netim, netim_devices):
 
 	check(bool(device_id != -1), f"Device '{TEST_DEVICE_NAME}' should be visible in Device Manager.")
 
+	# Not sure how long it takes to complete auto-configuration; may be too long to wait in the test case
+	# AUTOCONFIGURE DEVICE
+	#prompt(f"Autoconfiguring Device '{TEST_DEVICE_NAME}' in NetIM")
+	#try:
+	#	response = netim.autoconfigure_devices([TEST_DEVICE_NAME])
+	#except AttributeError as e:
+	#	logger.debug(f"AttributeError: {e}")
+	#except:
+	#	logger.info("Exception when autoconfiguring device")
+	#	logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	#
+	#prompt("Providing NetIM time to process ...")
+	#time.sleep(TEST_WAIT * 30)
+	#
+	#device_access_info = netim.get_device_access_info_by_device_id(device_id)
+	#has_community_string = False
+	#if 'hasSnmpCommunityString' in device_access_info:
+	#	has_community_string = device_access_info['hasSnmpCommunityString']
+	#check(bool(has_community_string == True), f"Device '{TEST_DEVICE_NAME}' is not yet configured")
+
+	# This call is currently not working
 	# UPDATE DEVICE TIMEZONE
-	prompt(f"Updating Device '{TEST_DEVICE_NAME}' timezone")
-	try:
-		response = netim.update_device_timezone(device_id, 'America/Chicago')
-	except AttributeError as e:
-		logger.debug(f"AttributeError: {e}")
-	except KeyError as e:
-		logger.debug(f"KeyError: {e}")
-	except NameError as e:
-		logger.debug(f"NameError: {e}")
-	except TypeError as e:
-		logger.debug(f"TypeError: {e}")
-	except:
-		logger.info("Exception when updating device timezone")
-		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
-	prompt("Providing NetIM time to process ...")
-	time.sleep(TEST_WAIT)
-
-	try:
-		device = netim.get_device_by_id(device_id)
-	except AttributeError as e:
-		logger.debug(f"AttributeError: {e}")
-	except:
-		logger.info("Exception when getting Device by ID")
-		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
+	#prompt(f"Updating Device '{TEST_DEVICE_NAME}' timezone")
+	#try:
+	#	response = netim.update_device_timezone(device_id, 'America/Chicago', 'Central Standard Time')
+	#except AttributeError as e:
+	#	logger.debug(f"AttributeError: {e}")
+	#except KeyError as e:
+	#	logger.debug(f"KeyError: {e}")
+	#except NameError as e:
+	#	logger.debug(f"NameError: {e}")
+	#except TypeError as e:
+	#	logger.debug(f"TypeError: {e}")
+	#except:
+	#	logger.info("Exception when updating device timezone")
+	#	logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	#
+	#prompt("Providing NetIM time to process ...")
+	#time.sleep(TEST_WAIT)
+	#
+	#try:
+	#	device = netim.get_device_by_id(device_id)
+	#except AttributeError as e:
+	#	logger.debug(f"AttributeError: {e}")
+	#except:
+	#	logger.info("Exception when getting Device by ID")
+	#	logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	#
 	# Test is failing
 	#check(bool(device['timeZone'] == 'America/Chicago'), "Timezone not updated.")
 
 	# ADD GROUP AND CONFIRM
-
 	prompt(f"Adding Group '{TEST_GROUP_NAME}' to NetIM")
 	try:
 		response = netim.add_group(TEST_GROUP_NAME)
@@ -275,7 +295,6 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	check(bool(group_id != -1), f"Group {TEST_GROUP_NAME} should be visible in Search.")
 
 	# ADD DEVICES TO GROUP AND CONFIRM
-
 	prompt(f"Add devices to Group '{TEST_GROUP_NAME}'")
 	try:
 		netim.add_devices_to_group(TEST_GROUP_NAME, [device_id])
@@ -330,7 +349,6 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	check(bool(device['city'] == city_id), "Location not updated.")
 
 	# REMOVE DEVICES FROM GROUP AND CONFIRM
-
 	prompt(f"Remove devices from Group '{TEST_GROUP_NAME}'")
 	try:
 		netim.remove_devices_from_group(TEST_GROUP_NAME, [device_id])
@@ -353,7 +371,6 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	test_custom_attributes_apis(netim, device_id, group_id)
 		
 	# DELETE GROUP AND CONFIRM
-
 	prompt(f"Delete Group '{TEST_GROUP_NAME}' from NetIM")
 	try:
 		netim.delete_group(TEST_GROUP_NAME)
