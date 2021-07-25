@@ -1986,7 +1986,7 @@ class NetIM(Service):
 			metric_map = {}
 			datetime_index = []
 			for timestamp, values in timestamp_to_values_map.items():
-				datetime_index.append(timestamp)
+				datetime_index.append(int(timestamp))
 				index = 0
 				for value in values:
 					try:
@@ -2025,9 +2025,10 @@ class NetIM(Service):
 	# 'value_map' as dictionary of key-to-display name
 	# The goal is to convert the metric data that is returned to a format that is easily
 	# pluggable into Pandas or other time series graphing solutions
-	def get_interface_utilization(self, interface_id, start_time=None, end_time=None, 
+	def get_interface_metrics(self, interface_id, start_time=None, end_time=None, 
 		duration=None, duration_time_units=None,
-		metric_epoch_enum='RAW', rollup_criterias=['aggregateAvgRollup']):
+		metric_epoch_enum='RAW', rollup_criterias=['aggregateAvgRollup'],
+		metrics=[]):
 		# metric_epoch_enum can be WEEKLY, DAILY, HOURLY, RAW
 		# rollup_criterias
 
@@ -2037,6 +2038,7 @@ class NetIM(Service):
 			return None
 
 		metric_data = self._get_metric_data(metric_class='IFC_UTIL', # metric Class
+			metrics=metrics,
 			start_time=start_time, end_time=end_time,
 			element_ids=[interface_id],
 			element_type='VNES_INTERFACE',
@@ -2048,6 +2050,41 @@ class NetIM(Service):
 		metric_dict_list = self._get_metric_dict_list_from_metric_data(metric_data)
 
 		return metric_dict_list
+
+	# Unsupported API call
+	def _get_top_n_metric_data(self, metric_class, metric, 
+		element_type='VNES_OE', search_type='topbottomn', 
+		start_time=None, end_time=None,
+		duration=None, duration_time_units=None,
+		top=False, n=10, time_window_algo='avg',
+		limit=None, page_size=1000, offset=0, 
+		legacy=False):
+
+		# Check for required parameters
+		if duration == None and (start_time == None or end_time == None):
+			logger.debug('Duration is not specified, and start time or end time is not provided.')
+			return None
+
+		topn_metric_request_data = {
+			'searchType':search_type,
+			'type':element_type,
+			'startTime':start_time,
+			'endTime':end_time,
+			'metricClass':metric_class,
+			'metric':metric,
+			'top':top,
+			'n': n,
+			'timeWindowAlgo':time_window_algo,
+			'limit':limit,
+			'offset':offset,
+			'pageSize':page_size,
+			'legacy':legacy,
+		}
+
+		url = f'{self.base_url}objects'
+		response = self._get_json_from_resource(url, topn_metric_request_data)
+
+		return response
 
 
 	def _import_metric_data(self, identifiers, max_timestamp, metric_class, min_timestamp,
@@ -2067,8 +2104,6 @@ class NetIM(Service):
 		response = self._post_json(url, data=data)
 
 		return response
-
-	#def get_top_n_metrics(self, ...)
 
 	# Alert Data API calls
 	#def get_alert_data_for_device(self, use_cache=False):
