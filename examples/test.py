@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Uncomment one of the following lines to review logging details interactively
 #logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 TEST_WAIT = 2
 TEST_AUTOMATION = True
@@ -35,7 +35,9 @@ TEST_COUNTRY_NAME = 'United States of America'
 
 TEST_ARCHIVE_DEVICE = 'MidA-Mgt-Switch01'
 
-TEST_POLLED_DEVICE_ID = 15027
+TEST_POLLED_DEVICE_NAME = 'MidA-Mgt-Switch01'
+TEST_POLLED_DEVICE_ID = 15009
+TEST_POLLED_DEVICE_INTERFACE = 'GigabitEthernet0/43'
 
 def prompt(step1, step2=""):
 	print(step1)
@@ -497,9 +499,34 @@ def test_metric_apis(netim):
 
 	end_time = int(time.time() * 1000)
 	start_time = end_time - 1000*60*60
-	metric_data = netim._get_metric_data(start_time=start_time, end_time=end_time, metric_class=metric_class_id, 
+	metric_data = netim._get_metric_data(metric_class_id, start_time=start_time, end_time=end_time, 
 		metrics=[metrics[2]['id'], metrics[3]['id']], 
 		element_ids=[TEST_POLLED_DEVICE_ID], sort_order='ASCENDING')
+
+	interface_id_json = netim.get_device_interface_by_device_name_and_interface_name(TEST_POLLED_DEVICE_NAME,
+		TEST_POLLED_DEVICE_INTERFACE)
+	interface_id = None
+	if interface_id_json != None and 'id' in interface_id_json:
+		interface_id = interface_id_json['id']
+	util_data = None
+	if interface_id != None:
+		intf_metric_data = netim.get_interface_metrics(interface_id, start_time=start_time, end_time=end_time,
+			metrics=['utilizationIn', 'utilizationOut'])
+	if intf_metric_data != None:
+		for intf_metric in intf_metric_data:
+			if intf_metric['metric'] not in ['utilizationIn', 'utilizationOut']:
+				logger.info(f"{intf_metric['metric']} found unexpectedly.")
+				continue
+
+			interface_display_name = netim.get_interface_display_name_from_id(intf_metric['object_id'])
+			prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
+			prompt(f"Metric: {intf_metric['metric']}")
+			prompt(f"Units: {intf_metric['units']}")
+			values = intf_metric['values']
+			prompt(f"Max: {max(values)}")
+			prompt(f"Min: {min(values)}")
+			prompt(f"Avg: {round(sum(values)/len(values),2)}")
+			prompt("")
 
 	return
 
@@ -544,9 +571,9 @@ def main():
 	prompt("Beginning test execution ...")
 	prompt("")
 
-	test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
-	test_devices_and_groups_apis(netim, netim_devices)
-	test_locations_apis(netim)
+	#test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
+	#test_devices_and_groups_apis(netim, netim_devices)
+	#test_locations_apis(netim)
 	test_metric_apis(netim)
 
 	return
