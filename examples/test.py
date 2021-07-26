@@ -521,11 +521,11 @@ def test_metric_apis(netim):
 			if interface_display_name not in reported:
 				prompt("")
 				prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
+				prompt(f"Rollup: Average")
 				reported[interface_display_name] = True
 			prompt(f"Metric: {intf_metric['metric']}, Units: {intf_metric['units']}")
-			prompt(f"Rollup: Average")
 			values = intf_metric['values']
-			prompt(f"Max: {max(values)}, Min: {min(values)}, Avg: {round(sum(values)/len(values),2)}")
+			prompt(f"Max: {round(max(values),2)}, Min: {round(min(values),2)}, Avg: {round(sum(values)/len(values),2)}")
 
 	intf_metric_data = None
 	if interface_id != None:
@@ -537,12 +537,13 @@ def test_metric_apis(netim):
 		for intf_metric in intf_metric_data:
 			interface_display_name = netim.get_interface_display_name_from_id(intf_metric['object_id'])
 			if interface_display_name not in reported:	
+				prompt("")
 				prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
+				prompt(f"Rollup: 98th")
 				reported[interface_display_name] = True
 			prompt(f"Metric: {intf_metric['metric']}, Units: {intf_metric['units']}")
-			prompt(f"Rollup: 98th")
 			values = intf_metric['values']
-			prompt(f"Max: {max(values)}, Min: {min(values)}, Avg: {round(sum(values)/len(values),2)}")
+			prompt(f"Max: {round(max(values),2)}, Min: {round(min(values),2)}, Avg: {round(sum(values)/len(values),2)}")
 
 	return
 
