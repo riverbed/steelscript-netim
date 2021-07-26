@@ -403,6 +403,8 @@ class NetworkMetricDataParams(Definition):
 	# metricEpochEnum is one of WEEKLY, DAILY, HOURLY, RAW
 	# sortOrder is one of ASCENDING, DESCENDING, UNSORTED
 	# timeFilterEnum is one of BUSINESS_HOURS, NON_BUSINESS_HOURS
+	# rollupCriterias is one of aggregateMinRollup, aggregateMaxRollup, aggregateAvgRollup,
+	#	 aggregatePctlRate95Rollup, "aggregatePctlRate98Rollup
 
 	def __init__(self, aggregate_filter, aggregations, compute_data_sketch_aggregations,
 		duration, duration_time_units, element_ids, element_type, end_time,
@@ -431,7 +433,7 @@ class NetworkMetricDataParams(Definition):
 		if limit != None:
 			self.limit = limit
 		self.metricClass = metric_class
-		#self.metricEpochEnum = metric_epoch_enum
+		self.metricEpochEnum = metric_epoch_enum
 		self.metrics = metrics
 		if page_id != None:
 			self.pageId = page_id
@@ -1903,6 +1905,8 @@ class NetIM(Service):
 		# sort_order can be ASCENDING, DESCENDING, UNSORTED
 		# start_time, end_time required if duration not set
 		# time_filter_enum can be BUSINESS_HOURS or NON_BUSINESS_HOURS
+		# rollupCriterias is one of aggregateMinRollup, aggregateMaxRollup, aggregateAvgRollup,
+		#	 aggregatePctlRate95Rollup, "aggregatePctlRate98Rollup
 
 		# Check for required parameters
 		if duration == None and (start_time == None or end_time == None):
@@ -1942,7 +1946,6 @@ class NetIM(Service):
 
 	def _get_metric_dict_list_from_metric_data(self, network_metric_data):
 
-		### metricEpochEnum, metricEpochDuration, timeFilterEnum not currently handled
 		if network_metric_data == None:
 			return None
 
@@ -2107,8 +2110,11 @@ class NetIM(Service):
 
 	# Alert Data API calls
 	#def get_alert_data_for_device(self, use_cache=False):
+	# DEV_ALERT_EVENTS_DETAILS
+	# DEV_ALERT_SYSLOG_DETAILS
 	#def get_alert_data_for_anp(self, ...):
+	# ANP_ALERT_EVENT_DETAILS
 	#def get_alert_data_for_group(self, ...):
 	#def get_alert_data_for_network(self, ...):
 	#def get_alert_data_for_test(self, ...):
-		
+	# AM_DATABASE_TEST_ALERT_EVENTS_DETAIL	

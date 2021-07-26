@@ -497,8 +497,8 @@ def test_metric_apis(netim):
 	metric_count = len(metrics)
 	prompt(f"There are {metric_count} metrics in metric class '{metric_class_name}' in NetIM.")
 
-	end_time = int(time.time() * 1000)
-	start_time = end_time - 1000*60*60
+	end_time = int(time.time() * 1000) - 1000*60*60 # One hour ago
+	start_time = end_time - 1000*60*60*10 # Last 10 hours)
 	metric_data = netim._get_metric_data(metric_class_id, start_time=start_time, end_time=end_time, 
 		metrics=[metrics[2]['id'], metrics[3]['id']], 
 		element_ids=[TEST_POLLED_DEVICE_ID], sort_order='ASCENDING')
@@ -509,24 +509,40 @@ def test_metric_apis(netim):
 	if interface_id_json != None and 'id' in interface_id_json:
 		interface_id = interface_id_json['id']
 	util_data = None
+	intf_metric_data = None
 	if interface_id != None:
 		intf_metric_data = netim.get_interface_metrics(interface_id, start_time=start_time, end_time=end_time,
-			metrics=['utilizationIn', 'utilizationOut'])
+			metrics=['utilizationIn', 'utilizationOut'], metric_epoch_enum='HOURLY',
+			rollup_criterias=['aggregateAvgRollup'])
+	reported = {}
 	if intf_metric_data != None:
 		for intf_metric in intf_metric_data:
-			if intf_metric['metric'] not in ['utilizationIn', 'utilizationOut']:
-				logger.info(f"{intf_metric['metric']} found unexpectedly.")
-				continue
-
 			interface_display_name = netim.get_interface_display_name_from_id(intf_metric['object_id'])
-			prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
-			prompt(f"Metric: {intf_metric['metric']}")
-			prompt(f"Units: {intf_metric['units']}")
+			if interface_display_name not in reported:
+				prompt("")
+				prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
+				reported[interface_display_name] = True
+			prompt(f"Metric: {intf_metric['metric']}, Units: {intf_metric['units']}")
+			prompt(f"Rollup: Average")
 			values = intf_metric['values']
-			prompt(f"Max: {max(values)}")
-			prompt(f"Min: {min(values)}")
-			prompt(f"Avg: {round(sum(values)/len(values),2)}")
-			prompt("")
+			prompt(f"Max: {max(values)}, Min: {min(values)}, Avg: {round(sum(values)/len(values),2)}")
+
+	intf_metric_data = None
+	if interface_id != None:
+		intf_metric_data = netim.get_interface_metrics(interface_id, start_time=start_time, end_time=end_time,
+			metrics=['utilizationIn', 'utilizationOut'], metric_epoch_enum='HOURLY', 
+			rollup_criterias=['aggregatePctlRate98Rollup'])
+	reported = {}
+	if intf_metric_data != None:
+		for intf_metric in intf_metric_data:
+			interface_display_name = netim.get_interface_display_name_from_id(intf_metric['object_id'])
+			if interface_display_name not in reported:	
+				prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
+				reported[interface_display_name] = True
+			prompt(f"Metric: {intf_metric['metric']}, Units: {intf_metric['units']}")
+			prompt(f"Rollup: 98th")
+			values = intf_metric['values']
+			prompt(f"Max: {max(values)}, Min: {min(values)}, Avg: {round(sum(values)/len(values),2)}")
 
 	return
 
