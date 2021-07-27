@@ -1,18 +1,16 @@
 sites:
 - name: San Francisco
-  interfaces:
-    - active: 
-      - device: Router1
-        interface: Ethernet0/1
-    - backup: 
-      - device: Router1
-        interface: Ethernet0/2
-      - device: Router2
-        interface: Ethernet0/3
+    active: 
+    - device: Router1
+      interface: Ethernet0/1
+    backup: 
+    - device: Router1
+      interface: Ethernet0/2
+    - device: Router2
+      interface: Ethernet0/3
 - name: Washington
-  interfaces:
-    - active: 
-      - device: Firewall1
-        interface: Ethernet0/1
-      - device: Firewall1
-        interface: Ethernet0/2
+    active: 
+    - device: Firewall1
+      interface: Ethernet0/1
+    - device: Firewall1
+      interface: Ethernet0/2
