@@ -1,0 +1,14 @@
+# Specify the authentication information for the NetIM source instance
+netim_hostname: 10.1.1.1
+netim_username: admin
+netim_password: admin
+
+# Provide reporting period, with time in format M-D-Y H:M:S
+start_time: 01-01-2021 00:00:00
+end_time: 12-31-2021 11:59:59
+
+# Provide granularity as one of RAW, HOURLY, DAILY, WEEKLY
+granularity: WEEKLY
+
+# Provide rollup as one of 'maximum', 'average', '95th percentile', '98th percentile'
+rollup: 95th percentile
