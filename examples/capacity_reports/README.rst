@@ -14,9 +14,9 @@ Quick start
   pip3 install -r requirements.txt
   python3 run.py --sites_yml sites.yml --config_yml config.yml
 
-sites_example.yml is an example of what needs to be included for each site and interface
-config_example.yml is where the NetIM authentication information is provided, along with reporting period and other parameters
-output shows an example output from a lab environment
+- sites_example.yml is an example of what needs to be included for each site and interface
+- config_example.yml is where the NetIM authentication information is provided, along with reporting period and other parameters
+- The output/ directory shows an example output from a lab environment
 
 Contribute
 -----------
