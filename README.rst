@@ -1,24 +1,22 @@
-Riverbed SteelScript for NetIM
+Example Capacity Reports
 ==============================
 
-**Riverbed SteelScript** is a collection of libraries and scripts written in Python for interacting
-with Riverbed appliances and solutions, and other network infrastructure devices.
-
-As part of the Riverbed SteelScript this module provides specific bindings for `Riverbed NetIM <https://www.riverbed.com/netim>`__ 
+**Capacity Reports** is an example Python script using the SteelScript libraries along with Python pandas and matplotlib libraries
+to pull utilization metrics for interfaces from NetIM, analyze them, and graph them.
 
 Quick start
 -----------
 
 .. code:: shell
 
-  # Build a docker image from latest code
-  docker build --tag steelscript:latest https://github.com/riverbed/steelscript.git
+  # To execute the command
+  cd <SteelScript-NetIM installation path>/examples/capacity_reports
+  pip3 install -r requirements.txt
+  python3 run.py --sites_yml sites.yml --config_yml config.yml
 
-  # Run the image in an interactive container
-  docker run -it steelscript:latest /bin/bash
-
-  # Replace the tokens {...} with actual values
-  python print-netim-devices-raw.py {NetIM Core fqdn or ip} --username {username} -password {password}
+sites_example.yml is an example of what needs to be included for each site and interface
+config_example.yml is where the NetIM authentication information is provided, along with reporting period and other parameters
+output shows an example output from a lab environment
 
 Contribute
 -----------
