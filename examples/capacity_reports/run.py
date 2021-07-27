@@ -207,6 +207,8 @@ def create_graph(site_name, device_name, interface_name, interface_type, metric_
 		import matplotlib.pyplot as plt
 	except ImportError as e:
 		raise Exception(f"The required Python libraries could not be imported. ImportError: {e}")
+	except:
+		raise
 
 	# Build plots
 	num_plots = 1
@@ -286,6 +288,7 @@ def create_site_summary(site, metrics_to_report=None, metric_display_names=None,
 
 					if 'object_id' in metric_data:
 						interface_id = metric_data['object_id']
+					units = None
 					if 'units' in metric_data:
 						units = metric_data['units']
 					if 'datetime_index' in metric_data:
@@ -344,6 +347,8 @@ def report(sites, metrics_to_report=[], metric_display_names=None, threshold=90,
 		import os
 	except ImportError as e:
 		raise Exception(f"The required Python libraries could not be imported. ImportError: {e}")
+	except:
+		raise
 		
 	if 'sites' in sites:
 		sites_to_report = sites['sites']
@@ -430,7 +435,7 @@ def report(sites, metrics_to_report=[], metric_display_names=None, threshold=90,
 				note += {metric}
 			i += 1
 		note += '<br>'
-		note += f'Threshold: {threshold} {units}<br>' ### Will need to be per-metric
+		note += f'Threshold: {threshold}<br>' ### Will need to be per-metric
 		note += f'Granularity: {granularity}<br>'
 		note += f'Rollup: {rollup_criterias[0]}<br>'
 		start_datetime = datetime.fromtimestamp(start_time / 1000)
