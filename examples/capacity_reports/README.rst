@@ -1,8 +1,7 @@
 Example Capacity Reports
 ==============================
 
-**Capacity Reports** is an example Python script using the SteelScript libraries along with Python pandas and matplotlib libraries
-to pull utilization metrics for interfaces from NetIM, analyze them, and graph them.
+**Capacity Reports** is an example Python script using the SteelScript libraries along with Python pandas and matplotlib libraries to pull utilization metrics for interfaces from NetIM, analyze them, and graph them.
 
 Quick start
 -----------
@@ -12,7 +11,7 @@ Quick start
   # To execute the command
   cd <SteelScript-NetIM installation path>/examples/capacity_reports
   pip3 install -r requirements.txt
-  python3 run.py --sites_yml sites.yml --config_yml config.yml
+  python3 report.py --sites_yml sites.yml --config_yml config.yml
 
 - sites_example.yml is an example of what needs to be included for each site and interface
 - config_example.yml is where the NetIM authentication information is provided, along with reporting period and other parameters
