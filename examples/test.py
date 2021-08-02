@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Uncomment one of the following lines to review logging details interactively
 #logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 TEST_WAIT = 2
 TEST_AUTOMATION = True
@@ -24,8 +24,8 @@ TEST_CUSTOM_ATTRIBUTE_DESCRIPTION = 'Test attribute created on device'
 TEST_CUSTOM_ATTRIBUTE_VALUE = 'Test'
 TEST_CUSTOM_ATTRIBUTE_VALUE_CHANGED = 'Changed'
 
-TEST_DEVICE_NAME = 'testxyz'
-TEST_DEVICE_ADDRESS = '10.199.199.199'
+TEST_DEVICE_NAME = 'test_appresponse'
+TEST_DEVICE_ADDRESS = '10.1.150.220'
 
 TEST_GROUP_NAME = 'groupxyz'
 TEST_SITE_NAME = 'Arlington'
@@ -35,7 +35,9 @@ TEST_COUNTRY_NAME = 'United States of America'
 
 TEST_ARCHIVE_DEVICE = 'MidA-Mgt-Switch01'
 
-TEST_POLLED_DEVICE_ID = 15027
+TEST_POLLED_DEVICE_NAME = 'MidA-Mgt-Switch01'
+TEST_POLLED_DEVICE_ID = 15009
+TEST_POLLED_DEVICE_INTERFACE = 'GigabitEthernet0/43'
 
 def prompt(step1, step2=""):
 	print(step1)
@@ -220,38 +222,58 @@ def test_devices_and_groups_apis(netim, netim_devices):
 
 	check(bool(device_id != -1), f"Device '{TEST_DEVICE_NAME}' should be visible in Device Manager.")
 
+	# Not sure how long it takes to complete auto-configuration; may be too long to wait in the test case
+	# AUTOCONFIGURE DEVICE
+	#prompt(f"Autoconfiguring Device '{TEST_DEVICE_NAME}' in NetIM")
+	#try:
+	#	response = netim.autoconfigure_devices([TEST_DEVICE_NAME])
+	#except AttributeError as e:
+	#	logger.debug(f"AttributeError: {e}")
+	#except:
+	#	logger.info("Exception when autoconfiguring device")
+	#	logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	#
+	#prompt("Providing NetIM time to process ...")
+	#time.sleep(TEST_WAIT * 30)
+	#
+	#device_access_info = netim.get_device_access_info_by_device_id(device_id)
+	#has_community_string = False
+	#if 'hasSnmpCommunityString' in device_access_info:
+	#	has_community_string = device_access_info['hasSnmpCommunityString']
+	#check(bool(has_community_string == True), f"Device '{TEST_DEVICE_NAME}' is not yet configured")
+
+	# This call is currently not working
 	# UPDATE DEVICE TIMEZONE
-	prompt(f"Updating Device '{TEST_DEVICE_NAME}' timezone")
-	try:
-		response = netim.update_device_timezone(device_id, 'America/Chicago')
-	except AttributeError as e:
-		logger.debug(f"AttributeError: {e}")
-	except KeyError as e:
-		logger.debug(f"KeyError: {e}")
-	except NameError as e:
-		logger.debug(f"NameError: {e}")
-	except TypeError as e:
-		logger.debug(f"TypeError: {e}")
-	except:
-		logger.info("Exception when updating device timezone")
-		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
-	prompt("Providing NetIM time to process ...")
-	time.sleep(TEST_WAIT)
-
-	try:
-		device = netim.get_device_by_id(device_id)
-	except AttributeError as e:
-		logger.debug(f"AttributeError: {e}")
-	except:
-		logger.info("Exception when getting Device by ID")
-		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
-
+	#prompt(f"Updating Device '{TEST_DEVICE_NAME}' timezone")
+	#try:
+	#	response = netim.update_device_timezone(device_id, 'America/Chicago', 'Central Standard Time')
+	#except AttributeError as e:
+	#	logger.debug(f"AttributeError: {e}")
+	#except KeyError as e:
+	#	logger.debug(f"KeyError: {e}")
+	#except NameError as e:
+	#	logger.debug(f"NameError: {e}")
+	#except TypeError as e:
+	#	logger.debug(f"TypeError: {e}")
+	#except:
+	#	logger.info("Exception when updating device timezone")
+	#	logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	#
+	#prompt("Providing NetIM time to process ...")
+	#time.sleep(TEST_WAIT)
+	#
+	#try:
+	#	device = netim.get_device_by_id(device_id)
+	#except AttributeError as e:
+	#	logger.debug(f"AttributeError: {e}")
+	#except:
+	#	logger.info("Exception when getting Device by ID")
+	#	logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+	#
 	# Test is failing
 	#check(bool(device['timeZone'] == 'America/Chicago'), "Timezone not updated.")
 
 	# ADD GROUP AND CONFIRM
-
 	prompt(f"Adding Group '{TEST_GROUP_NAME}' to NetIM")
 	try:
 		response = netim.add_group(TEST_GROUP_NAME)
@@ -275,7 +297,6 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	check(bool(group_id != -1), f"Group {TEST_GROUP_NAME} should be visible in Search.")
 
 	# ADD DEVICES TO GROUP AND CONFIRM
-
 	prompt(f"Add devices to Group '{TEST_GROUP_NAME}'")
 	try:
 		netim.add_devices_to_group(TEST_GROUP_NAME, [device_id])
@@ -330,7 +351,6 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	check(bool(device['city'] == city_id), "Location not updated.")
 
 	# REMOVE DEVICES FROM GROUP AND CONFIRM
-
 	prompt(f"Remove devices from Group '{TEST_GROUP_NAME}'")
 	try:
 		netim.remove_devices_from_group(TEST_GROUP_NAME, [device_id])
@@ -353,7 +373,6 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	test_custom_attributes_apis(netim, device_id, group_id)
 		
 	# DELETE GROUP AND CONFIRM
-
 	prompt(f"Delete Group '{TEST_GROUP_NAME}' from NetIM")
 	try:
 		netim.delete_group(TEST_GROUP_NAME)
@@ -478,11 +497,53 @@ def test_metric_apis(netim):
 	metric_count = len(metrics)
 	prompt(f"There are {metric_count} metrics in metric class '{metric_class_name}' in NetIM.")
 
-	end_time = int(time.time() * 1000)
-	start_time = end_time - 1000*60*60
-	metric_data = netim._get_metric_data(start_time=start_time, end_time=end_time, metric_class=metric_class_id, 
+	end_time = int(time.time() * 1000) - 1000*60*60 # One hour ago
+	start_time = end_time - 1000*60*60*10 # Last 10 hours)
+	metric_data = netim._get_metric_data(metric_class_id, start_time=start_time, end_time=end_time, 
 		metrics=[metrics[2]['id'], metrics[3]['id']], 
 		element_ids=[TEST_POLLED_DEVICE_ID], sort_order='ASCENDING')
+
+	interface_id_json = netim.get_device_interface_by_device_name_and_interface_name(TEST_POLLED_DEVICE_NAME,
+		TEST_POLLED_DEVICE_INTERFACE)
+	interface_id = None
+	if interface_id_json != None and 'id' in interface_id_json:
+		interface_id = interface_id_json['id']
+	util_data = None
+	intf_metric_data = None
+	if interface_id != None:
+		intf_metric_data = netim.get_interface_metrics(interface_id, start_time=start_time, end_time=end_time,
+			metrics=['utilizationIn', 'utilizationOut'], metric_epoch_enum='HOURLY',
+			rollup_criterias=['aggregateAvgRollup'])
+	reported = {}
+	if intf_metric_data != None:
+		for intf_metric in intf_metric_data:
+			interface_display_name = netim.get_interface_display_name_from_id(intf_metric['object_id'])
+			if interface_display_name not in reported:
+				prompt("")
+				prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
+				prompt(f"Rollup: Average")
+				reported[interface_display_name] = True
+			prompt(f"Metric: {intf_metric['metric']}, Units: {intf_metric['units']}")
+			values = intf_metric['values']
+			prompt(f"Max: {round(max(values),2)}, Min: {round(min(values),2)}, Avg: {round(sum(values)/len(values),2)}")
+
+	intf_metric_data = None
+	if interface_id != None:
+		intf_metric_data = netim.get_interface_metrics(interface_id, start_time=start_time, end_time=end_time,
+			metrics=['utilizationIn', 'utilizationOut'], metric_epoch_enum='HOURLY', 
+			rollup_criterias=['aggregatePctlRate98Rollup'])
+	reported = {}
+	if intf_metric_data != None:
+		for intf_metric in intf_metric_data:
+			interface_display_name = netim.get_interface_display_name_from_id(intf_metric['object_id'])
+			if interface_display_name not in reported:	
+				prompt("")
+				prompt(f"{TEST_POLLED_DEVICE_NAME}:{interface_display_name}")
+				prompt(f"Rollup: 98th")
+				reported[interface_display_name] = True
+			prompt(f"Metric: {intf_metric['metric']}, Units: {intf_metric['units']}")
+			values = intf_metric['values']
+			prompt(f"Max: {round(max(values),2)}, Min: {round(min(values),2)}, Avg: {round(sum(values)/len(values),2)}")
 
 	return
 
@@ -527,9 +588,9 @@ def main():
 	prompt("Beginning test execution ...")
 	prompt("")
 
-	test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
-	test_devices_and_groups_apis(netim, netim_devices)
-	test_locations_apis(netim)
+	#test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
+	#test_devices_and_groups_apis(netim, netim_devices)
+	#test_locations_apis(netim)
 	test_metric_apis(netim)
 
 	return

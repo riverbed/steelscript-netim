@@ -403,6 +403,8 @@ class NetworkMetricDataParams(Definition):
 	# metricEpochEnum is one of WEEKLY, DAILY, HOURLY, RAW
 	# sortOrder is one of ASCENDING, DESCENDING, UNSORTED
 	# timeFilterEnum is one of BUSINESS_HOURS, NON_BUSINESS_HOURS
+	# rollupCriterias is one of aggregateMinRollup, aggregateMaxRollup, aggregateAvgRollup,
+	#	 aggregatePctlRate95Rollup, "aggregatePctlRate98Rollup
 
 	def __init__(self, aggregate_filter, aggregations, compute_data_sketch_aggregations,
 		duration, duration_time_units, element_ids, element_type, end_time,
@@ -431,7 +433,7 @@ class NetworkMetricDataParams(Definition):
 		if limit != None:
 			self.limit = limit
 		self.metricClass = metric_class
-		#self.metricEpochEnum = metric_epoch_enum
+		self.metricEpochEnum = metric_epoch_enum
 		self.metrics = metrics
 		if page_id != None:
 			self.pageId = page_id
@@ -703,8 +705,8 @@ class NetIM(Service):
 							status_info = response['statusInfo']
 						logger.info(f"Device status: {status}:{status_info}")
 			elif response.status_code >=200 and response.status_code < 300:
-				resp_text = response.text
-				return resp_text
+				response_json = response.json()
+				return response_json
 			else:
 				logger.info(f"Error while posting. Status code: {response.status_code}")
 				logger.debug(f"{response}")
@@ -978,6 +980,11 @@ class NetIM(Service):
 		response = self._get_json_from_resource(url)
 		return response
 
+	def get_device_access_info_by_device_id(self, device_id):
+		url = f'{self.base_url}/devices/{device_id}/device-access-info'
+		response = self._get_json_from_resource(url)
+		return response
+
 	def _get_sysname_access_id_map(self, use_cache=False):
 		return self._get_object_id_map('devices', 'id', 'sysName', 'deviceName', use_cache)
 
@@ -997,8 +1004,8 @@ class NetIM(Service):
 			logger.info(f"Delete and re-add device or update relevant device information.")
 			raise Exception(f'Device name {device_name} already exists in NetIM.')
 
-		device_list=[{'device_name':device_name, 'access_address':access_address}]
-		devices = ModifiableDeviceList(device_list)
+		device_entry_list = [{'device_name':device_name, 'access_address':access_address}]
+		devices = ModifiableDeviceList(device_entry_list)
 		response = self._add_devices_from_definition(devices)
 
 		return response
@@ -1035,13 +1042,13 @@ class NetIM(Service):
 		return response
 
 	### This function does not work
-	def update_device_timezone(self, device_id, timezone):
+	def update_device_timezone(self, device_id, timezone, timezone_display_name=None):
 		
 		device_json = self.get_device_by_id(device_id)
 
 		# Clean up retrieved device JSON into modifiable device JSON
 		modifiable_device = ModifiableDevice(id=str(device_id),
-			time_zone=timezone)
+			time_zone=timezone, time_zone_display_name=timezone_display_name)
 
 		# Add to a list of modified devices
 		modified_devices = ModifiableDeviceList()
@@ -1098,6 +1105,29 @@ class NetIM(Service):
 		response = self._update_devices(modifiable_devices)
 
 		return response
+
+	### Unsupported API call
+	def autoconfigure_devices(self, device_names=[]):
+		
+		valid_device_names = []
+		for device_name in device_names:
+			device_id = int(self.get_device_id_by_device_name(device_name))
+			if device_id != -1:
+				valid_device_names.append(device_name)
+			else:
+				logger.info(f'The device {device_name} was not found in NetIM and cannot be autoconfigured.')
+
+		if len(valid_device_names) > 0:
+			url = f'{self.base_url}rpc/autoconfig'
+			data = {}
+			data['deviceNamesOrAddresses'] = device_names
+			data_json = dumps(data)
+
+			response = self._post_json(url, data=data_json)
+		else:
+			logger.info(f'There were no valid device names provided to autoconfigure.')
+
+		return
 	
 	
 	# Interface API calls
@@ -1106,16 +1136,44 @@ class NetIM(Service):
 		device_interfaces_json = self._get_json_from_resource(url)
 		return device_interfaces_json
 
-	def get_device_interface_name_map(self, url, device_id, use_cache=False):
+	def get_device_interface_name_map(self, device_id, use_cache=False):
 		url = f'devices/{device_id}/interfaces'
 		return self._get_object_id_map(url, 'name', 'id', use_cache)
 
-	### def get_device_interfaces_by_device_id(self, device_id):
+	def get_device_interface_id_map(self, device_id, use_cache=False):
+		url = f'devices/{device_id}/interfaces'
+		return self._get_object_id_map(url, 'id', 'name', use_cache)
+
+	def get_device_interface_by_device_name_and_interface_name(self, device_name, interface_name, use_cache=False):
+		interface_id = -1
+		device_id = int(self.get_device_id_by_device_name(device_name))
+		if device_id > -1:
+			device_interface_map = self.get_device_interface_id_map(device_id, use_cache=use_cache)
+			if interface_name in device_interface_map:
+				interface_id = int(device_interface_map[interface_name])
+			else:
+				logger.debug(f"Interface name '{interface_name}' not found on device name '{device_name}'")
+		else:
+			logger.debug(f"Device name '{device_name}' not found in NetIM")
+
+		interface_json = None		
+		if interface_id > -1:
+			interface_json = self.get_interface(interface_id)
+			
+		return interface_json
 
 	def get_interface(self, interface_id):
 		url = f'{self.base_url}interfaces/{interface_id}'
 		interface_json = self._get_json_from_resource(url)
 		return interface_json
+
+	def get_interface_display_name_from_id(self, interface_id):
+		interface_json = self.get_interface(interface_id)
+		if interface_json != None and 'displayName' in interface_json:
+			return interface_json['displayName']
+		else:
+			logger.debug('Could not find interface name. Returning interface ID as name.')
+			return str(interface_id)
 
 	def delete_interface(self, interface_id):
 		url = f'{self.base_url}interfaces/{interface_id}'
@@ -1306,7 +1364,7 @@ class NetIM(Service):
 			return
 		parent_group_id = int(self.get_group_id_by_group_name(parent_group_name))
 		if parent_group_id < 0:
-			logger.info(f"Gropu name '{parent_group_name}' not found in NetIM")
+			logger.info(f"Group name '{parent_group_name}' not found in NetIM")
 			return
 
 		url = f'{self.base_url}groups/{parent_group_id}'
@@ -1749,7 +1807,7 @@ class NetIM(Service):
 		return response
 
 	def update_custom_attribute_value_from_id(self, attribute_value_id, new_value):
-		url = f'{self.base_url}custom-attribute-values/{attribue_value_id}'
+		url = f'{self.base_url}custom-attribute-values/{attribute_value_id}'
 		data = {}
 		data['value'] = new_value
 
@@ -1759,7 +1817,7 @@ class NetIM(Service):
 	def update_custom_attribute_value(self, cust_attr_name, old_value, new_value):
 		attribute_value_id = int(self.get_custom_attribute_value_id_by_name_and_value(cust_attr_name, old_value))
 		if attribute_value_id >= 0:
-			response = self.update_custom_attribute_value_by_id(self, attribute_value_id, new_value)
+			response = self.update_custom_attribute_value_from_id(attribute_value_id, new_value)
 		else:
 			raise Exception(f"Custom attribute '{cust_attr_name}' not found in NetIM.")
 
@@ -1824,16 +1882,36 @@ class NetIM(Service):
 	### def delete_notification_template_from_id(self, notification_template_id):
 	### def add_notification_template(self, notification_template):	
 
-	def _get_metric_data(self, start_time, end_time, metric_class, metrics=[], 
+	def _get_metric_data(self, metric_class, metrics=[], 
 		element_ids=[], element_type='VNES_OE',
 		include_element_ref_info_details=False, include_element_ref_info_string_only=True, 
 		include_samples=True,
+		start_time=None, end_time=None,
 		duration=None, duration_time_units=None, limit=None,
 		aggregate_filter=None, aggregations=None,
 		compute_data_sketch_aggregations=True,
 		metric_epoch_enum='RAW', page_id=None, page_size=1000, 
 		rollup_criterias=['aggregateAvgRollup'], sample_filter=None, sort_order='ASCENDING', 
 		time_filter_enum='BUSINESS_HOURS'):
+		# aggregate_filters have three fields (metrics, value, operation)
+		#	operation can be EQU, NEQ, GT, GEQ, LT, LEQ, CONTAINS, NOT_CONTAINS
+		#	value should be {} for no filter or an actual value for the filter
+		# duration specifies the most recent time be used for the time window;
+		# 	if not specified, the start_time and end_time are used
+		# duration_time_units can be NANOSECONDS, MICROSECONDS, MILLISECONDS, SECONDS, MINUTES, HOURS, DAYS;
+		# 	default is MILLISECONDS
+		# element_type can be VNES_OE, VNES_INTERFACE, VNES_GROUP, etc.
+		# metric_epoch_enum can be WEEKLY, DAILY, HOURLY, RAW
+		# sort_order can be ASCENDING, DESCENDING, UNSORTED
+		# start_time, end_time required if duration not set
+		# time_filter_enum can be BUSINESS_HOURS or NON_BUSINESS_HOURS
+		# rollupCriterias is one of aggregateMinRollup, aggregateMaxRollup, aggregateAvgRollup,
+		#	 aggregatePctlRate95Rollup, "aggregatePctlRate98Rollup
+
+		# Check for required parameters
+		if duration == None and (start_time == None or end_time == None):
+			logger.debug('Duration is not specified, and start time or end time is not provided.')
+			return None
 
 		url = f'{self.metric_export_url}network-metric-data'
 
@@ -1866,7 +1944,153 @@ class NetIM(Service):
 
 		return response
 
-	def __import_metric_data(self, identifiers, max_timestamp, metric_class, min_timestamp,
+	def _get_metric_dict_list_from_metric_data(self, network_metric_data):
+
+		if network_metric_data == None:
+			return None
+
+		id_to_object_map = None
+		if 'elementIdToObjectInfoMap' in network_metric_data:
+			id_to_object_map = network_metric_data['elementIdToObjectInfoMap']
+
+		metric_data = metric_indices = metric_to_metainfo_map = None
+		if 'metricData' in network_metric_data:
+			metric_data = network_metric_data['metricData']
+			if 'metricNames' in metric_data:
+				metric_indices = metric_data['metricNames']
+			if 'metricToMetaInfoMap' in metric_data:
+				metric_to_metainfo_map = metric_data['metricToMetaInfoMap']
+
+		metric_element_data_list = None
+		if 'metricElementDataList' in metric_data:
+			metric_element_data_list = metric_data['metricElementDataList']
+
+		if id_to_object_map == None or metric_to_metainfo_map == None or metric_data == None or \
+			metric_indices == None or metric_element_data_list == None:
+			logger.debug("Network metric data fields were not formatted as expected.")
+			return None
+
+		object_id = None
+		result = []
+		for metric_element_data in metric_element_data_list:
+			object_id = -1
+			if 'elementId' in metric_element_data:
+				object_info = id_to_object_map[str(metric_element_data['elementId'])]
+				if 'objectId' in object_info:
+					object_id = object_info['objectId']
+			timestamp_to_values_map = None
+			if 'timestampToValuesMap' in metric_element_data:
+				timestamp_to_values_map = metric_element_data['timestampToValuesMap']
+
+			if object_id == -1 or timestamp_to_values_map == None:
+				logger.debug("Metric element data list was not formatted as expected.")
+				continue
+
+			metric_map = {}
+			datetime_index = []
+			for timestamp, values in timestamp_to_values_map.items():
+				datetime_index.append(int(timestamp))
+				index = 0
+				for value in values:
+					try:
+						value_to_append = float(value)
+					except ValueError:
+						value_to_append = value
+					if metric_indices[index] in metric_map:
+						metric_map[metric_indices[index]].append(value_to_append)
+					else:
+						metric_map[metric_indices[index]] = [value_to_append]
+					index += 1
+				
+			for metric in metric_map:
+				metric_dict = {}
+				metric_dict['object_id'] = object_id
+				metric_dict['metric'] = metric
+				metric_dict['datetime_index'] = datetime_index
+				metric_dict['values'] = metric_map[metric]
+
+				units_and_value_map = metric_to_metainfo_map[metric] 
+				if 'units' in units_and_value_map:
+					metric_dict['units'] = units_and_value_map['units']
+				if 'valueEnumMap' in units_and_value_map:
+					if units_and_value_map['valueEnumMap'] != 'null':
+						metric_dict['value_map'] = units_and_value_map['valueEnumMap']
+				result.append(metric_dict)
+
+		return result
+
+	# get_interface_utilization returns a list of dictionary objects:
+	# 'object_id' as string; in this case, the interface integer object ID
+	# 'metric' as string
+	# 'units' as string
+	# 'datetime_index' as list of timestamps
+	# 'values' as list of values
+	# 'value_map' as dictionary of key-to-display name
+	# The goal is to convert the metric data that is returned to a format that is easily
+	# pluggable into Pandas or other time series graphing solutions
+	def get_interface_metrics(self, interface_id, start_time=None, end_time=None, 
+		duration=None, duration_time_units=None,
+		metric_epoch_enum='RAW', rollup_criterias=['aggregateAvgRollup'],
+		metrics=[]):
+		# metric_epoch_enum can be WEEKLY, DAILY, HOURLY, RAW
+		# rollup_criterias
+
+		# Check for required parameters
+		if duration == None and (start_time == None or end_time == None):
+			logger.debug('Duration is not specified, and start time or end time is not provided.')
+			return None
+
+		metric_data = self._get_metric_data(metric_class='IFC_UTIL', # metric Class
+			metrics=metrics,
+			start_time=start_time, end_time=end_time,
+			element_ids=[interface_id],
+			element_type='VNES_INTERFACE',
+			duration=duration,
+			duration_time_units=duration_time_units,
+			metric_epoch_enum=metric_epoch_enum,
+			rollup_criterias=rollup_criterias)
+
+		metric_dict_list = self._get_metric_dict_list_from_metric_data(metric_data)
+
+		return metric_dict_list
+
+	# Unsupported API call
+	def _get_top_n_metric_data(self, metric_class, metric, 
+		element_type='VNES_OE', search_type='topbottomn', 
+		start_time=None, end_time=None,
+		duration=None, duration_time_units=None,
+		top=False, n=10, time_window_algo='avg',
+		limit=None, page_size=1000, offset=0, 
+		legacy=False):
+
+		# Check for required parameters
+		if duration == None and (start_time == None or end_time == None):
+			logger.debug('Duration is not specified, and start time or end time is not provided.')
+			return None
+
+		topn_metric_request_data = {
+			'searchType':search_type,
+			'type':element_type,
+			'startTime':start_time,
+			'endTime':end_time,
+			'metricClass':metric_class,
+			'metric':metric,
+			'top':top,
+			'n': n,
+			'timeWindowAlgo':time_window_algo,
+			'limit':limit,
+			'offset':offset,
+			'pageSize':page_size,
+			'legacy':legacy,
+		}
+
+		url = f'{self.base_url}objects'
+		response = self._get_json_from_resource(url, topn_metric_request_data)
+
+		return response
+
+
+	def _import_metric_data(self, identifiers, max_timestamp, metric_class, min_timestamp,
 		sample_list, source):
 		
 		url = f'{self.metric_import_url}network-metric-import'
@@ -1884,12 +2108,13 @@ class NetIM(Service):
 
 		return response
 
-	#def get_top_n_metrics(self, ...)
-
 	# Alert Data API calls
 	#def get_alert_data_for_device(self, use_cache=False):
+	# DEV_ALERT_EVENTS_DETAILS
+	# DEV_ALERT_SYSLOG_DETAILS
 	#def get_alert_data_for_anp(self, ...):
+	# ANP_ALERT_EVENT_DETAILS
 	#def get_alert_data_for_group(self, ...):
 	#def get_alert_data_for_network(self, ...):
 	#def get_alert_data_for_test(self, ...):
-		
+	# AM_DATABASE_TEST_ALERT_EVENTS_DETAIL	
