@@ -258,7 +258,7 @@ def create_forecast(site_name, device_name, interface_name, interface_type, metr
 		forecast_df[col] = forecast_df[col].clip(lower=0.0)
 
 	title = f'{device_name} - {interface_name} - {interface_type}'
-	predict_fig = model.plot(forecast_df, xlabel='Date', ylabel='{metric}')
+	predict_fig = model.plot(forecast_df, xlabel='Date', ylabel=f'{metric}')
 	predict_ax = predict_fig.gca()
 	predict_ax.set_title(title, size=16)
 
@@ -381,7 +381,7 @@ def forecast(sites, metrics_to_forecast=[], metric_display_names=None, threshold
 			if metric in metric_display_names:
 				note += f'{metric_display_names[metric]}'
 			else:
-				note += {metric}
+				note += f'{metric}'
 			i += 1
 		note += '<br>'
 		note += f'Threshold: {threshold}<br>' ### Will need to be per-metric
