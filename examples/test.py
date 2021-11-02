@@ -273,6 +273,25 @@ def test_devices_and_groups_apis(netim, netim_devices):
 	# Test is failing
 	#check(bool(device['timeZone'] == 'America/Chicago'), "Timezone not updated.")
 
+	# UPDATE DEVICE ACCESS ADDRESS
+	prompt(f"Updating Device '{TEST_DEVICE_NAME}' access address")
+	try:
+		response = netim.update_device_access_address(device_id, "10.10.10.10")
+	except:
+		logger.info("Exception when updating device access address")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	prompt("Providing NetIM time to process ...")
+	time.sleep(TEST_WAIT)
+
+	try:
+		device = netim.get_device_by_id(device_id)
+	except:
+		logger.info("Exception when getting Device by ID")
+		logger.debug("Unexpected error {}".format(sys.exc_info()[0]))
+
+	check(bool(device['accessAddress'] == '10.10.10.10'), "Access address not updated.")
+
 	# ADD GROUP AND CONFIRM
 	prompt(f"Adding Group '{TEST_GROUP_NAME}' to NetIM")
 	try:
@@ -589,7 +608,7 @@ def main():
 	prompt("")
 
 	#test_archives_apis(netim, TEST_ARCHIVE_DEVICE)
-	#test_devices_and_groups_apis(netim, netim_devices)
+	test_devices_and_groups_apis(netim, netim_devices)
 	#test_locations_apis(netim)
 	test_metric_apis(netim)
 
