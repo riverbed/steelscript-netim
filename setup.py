@@ -11,7 +11,6 @@ packagedata = True
 
 setup_args = {
     'name':               'steelscript.netim',
-    'namespace_packages': ['steelscript'],
     'version':            '24.2.1',
     'author':             'Riverbed Community',
     'author_email':       'community@riverbed.com',
