@@ -35,7 +35,7 @@ Links
 License
 =======
 
-Copyright (c) 2021 Riverbed Technology, Inc.
+Copyright (c) 2021-2024 Riverbed Technology, Inc.
 
 SteelScript is licensed under the terms and conditions of the MIT License
 accompanying the software ("License").  SteelScript is distributed "AS

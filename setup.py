@@ -1,4 +1,4 @@
-# Copyright (c) 2019 Riverbed Technology, Inc.
+# Copyright (c) 2019-2024 Riverbed Technology, Inc.
 #
 # This software is licensed under the terms and conditions of the MIT License
 # accompanying the software ("License").  This software is distributed "AS IS"
@@ -9,13 +9,9 @@ from glob import glob
 from setuptools import setup, find_packages
 packagedata = True
 
-
-#from gitpy_versioning import get_version
-
 setup_args = {
     'name':               'steelscript.netim',
-    'namespace_packages': ['steelscript'],
-    #'version':            get_version(),
+    'version':            '24.2.1',
     'author':             'Riverbed Community',
     'author_email':       'community@riverbed.com',
     'url':                'https://community.riverbed.com',
@@ -39,7 +35,7 @@ https://support.riverbed.com/apis/steelscript
         'Intended Audience :: Information Technology',
         'Intended Audience :: System Administrators',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.12',
         'Topic :: System :: Networking',
     ],
 
@@ -52,7 +48,7 @@ https://support.riverbed.com/apis/steelscript
     ),
 
     'install_requires': (
-        'steelscript>=2.0',
+        'steelscript>=24.2.0',
     ),
 
     'extras_require': None,
