@@ -198,7 +198,7 @@ def pull_metric_data_for_sites(netim, sites, start_time, end_time, metrics_to_pu
 
 	return sites
 
-def create_graph(site_name, device_name, interface_name, interface_type, metric_display_name, units, dates, values, output_dir='output'):
+def create_graph(site_name, device_name, interface_name, interface_type, metric_display_name, units, dates, values, output_dir='report'):
 	try:
 		from datetime import datetime
 		import html
@@ -241,7 +241,14 @@ def create_graph(site_name, device_name, interface_name, interface_type, metric_
 	metric_display_name_html = metric_display_name.replace(' ', '-')
 
 	filename = f'{device_name_html}_{interface_name_html}_{metric_display_name_html}_{start_time_str}_{end_time_str}.png'
-	path = f'{os.getcwd()}/{output_dir}/{filename}'
+	directory = f'{os.getcwd()}/{output_dir}'
+	if not os.path.exists(directory):
+		try:
+			os.makedirs(directory)
+		except OSError as e:
+			if e.errno != errno.EEXIST:
+				raise
+	path = f'{directory}/{filename}'
 	plt.savefig(f'{path}', bbox_inches='tight', pad_inches=0.5)
 	plt.close()
 			
@@ -339,7 +346,7 @@ def create_site_summary(site, metrics_to_report=None, metric_display_names=None,
 
 	return summary
 
-def report(sites, metrics_to_report=[], metric_display_names=None, threshold=90, output_dir='output', granularity='RAW',
+def report(sites, metrics_to_report=[], metric_display_names=None, threshold=90, output_dir='report', granularity='RAW',
 	rollup_criterias=[], start_time=None, end_time=None):
 
 	try:
@@ -362,7 +369,15 @@ def report(sites, metrics_to_report=[], metric_display_names=None, threshold=90,
 		sites_with_summary[site['name']] = create_site_summary(site, metrics_to_report=metrics_to_report,
 			metric_display_names=metric_display_names, threshold=threshold)
 
-	index_html = f'{os.getcwd()}/{output_dir}/index.html'
+
+	directory = f'{os.getcwd()}/{output_dir}'
+	if not os.path.exists(directory):
+		try:
+			os.makedirs(directory)
+		except OSError as e:
+			if e.errno != errno.EEXIST:
+				raise
+	index_html = f'{directory}/index.html'
 	with open(index_html, 'w') as index_html_f:
 		body = ''
 		for site_name, summary in sites_with_summary.items():

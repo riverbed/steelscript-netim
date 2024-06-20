@@ -1041,6 +1041,21 @@ class NetIM(Service):
 		response = self._patch_json(url, data=dumps(devices_json, cls=DefinitionJSONEncoder))
 		return response
 
+	def update_device_access_address(self, device_id, access_address):
+		
+		device_json = self.get_device_by_id(device_id)
+
+		modifiable_device = ModifiableDevice(id=str(device_id),
+			access_address=access_address)
+
+		# Add to a list of modified devices
+		modified_devices = ModifiableDeviceList()
+		modified_devices.add_device(modifiable_device)
+		
+		response = self._update_devices(modified_devices)
+
+		return response
+
 	### This function does not work
 	def update_device_timezone(self, device_id, timezone, timezone_display_name=None):
 		
