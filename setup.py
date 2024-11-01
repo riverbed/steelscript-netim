@@ -7,7 +7,6 @@
 from glob import glob
 
 from setuptools import setup, find_packages
-packagedata = True
 
 setup_args = {
     'name':               'steelscript.netim',
@@ -43,7 +42,7 @@ https://support.riverbed.com/apis/steelscript
 
     'data_files': (
         ('share/doc/steelscript/docs/netim', glob('docs/*')),
-        ('share/doc/steelscript/examples/netim', glob('examples/*')),
+        ('share/doc/steelscript/examples/netim', glob('examples/*.py')),
         ('share/doc/steelscript/notebooks/netim', glob('notebooks/*')),
     ),
 
@@ -67,7 +66,5 @@ https://support.riverbed.com/apis/steelscript
     },
 }
 
-if packagedata:
-    setup_args['include_package_data'] = True
 
 setup(**setup_args)
