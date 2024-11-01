@@ -42,7 +42,7 @@ https://support.riverbed.com/apis/steelscript
 
     'data_files': (
         ('share/doc/steelscript/docs/netim', glob('docs/*')),
-        ('share/doc/steelscript/examples/netim', glob('examples/*.py')),
+        ('share/doc/steelscript/examples/netim', glob('examples/*')),
         ('share/doc/steelscript/notebooks/netim', glob('notebooks/*')),
     ),
 
