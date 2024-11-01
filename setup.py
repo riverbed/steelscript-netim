@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup_args = {
     'name':               'steelscript.netim',
-    'version':            '24.2.1',
+    'version':            '24.11.1',
     'author':             'Riverbed Community',
     'author_email':       'community@riverbed.com',
     'url':                'https://community.riverbed.com',
