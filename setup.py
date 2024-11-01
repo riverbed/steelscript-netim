@@ -59,10 +59,7 @@ https://support.riverbed.com/apis/steelscript
     'entry_points': {
         'steel.commands': [
             'netim = steelscript.netim.commands'
-        ],
-        'portal.plugins': [
-            'netim = steelscript.netim.appfwk.plugin:NetIMPlugin'
-        ],
+        ]
     },
 }
 
