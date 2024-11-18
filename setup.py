@@ -7,11 +7,10 @@
 from glob import glob
 
 from setuptools import setup, find_packages
-packagedata = True
 
 setup_args = {
     'name':               'steelscript.netim',
-    'version':            '24.2.1',
+    'version':            '24.11.1',
     'author':             'Riverbed Community',
     'author_email':       'community@riverbed.com',
     'url':                'https://community.riverbed.com',
@@ -60,14 +59,9 @@ https://support.riverbed.com/apis/steelscript
     'entry_points': {
         'steel.commands': [
             'netim = steelscript.netim.commands'
-        ],
-        'portal.plugins': [
-            'netim = steelscript.netim.appfwk.plugin:NetIMPlugin'
-        ],
+        ]
     },
 }
 
-if packagedata:
-    setup_args['include_package_data'] = True
 
 setup(**setup_args)
